@@ -40,6 +40,7 @@ public final class TmuxSession: @unchecked Sendable {
     public func attach(writer: @escaping (String) -> Void) {
         gateway.attach(writer: writer)
         gateway.optInToNewLayouts()
+        gateway.sendFireAndForget("source-file ~/.pterm2/.tmux.conf")
         gateway.displayVersion { [weak self] result in
             if case .success(let version) = result {
                 self?.gateway.tmuxVersion = version.trimmingCharacters(in: .whitespacesAndNewlines)

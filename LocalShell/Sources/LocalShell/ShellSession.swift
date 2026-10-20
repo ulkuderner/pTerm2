@@ -14,6 +14,7 @@ public final class ShellSession: @unchecked Sendable {
             environment: [
                 "HOME": documents.path,
                 "PATH": "/usr/bin:/bin:\(documents.appendingPathComponent("Library/bin").path)",
+                "SHELL": "/bin/zsh",
                 "TERM": "xterm-256color"
             ],
             stdout: { _ in },
@@ -36,7 +37,7 @@ public final class ShellSession: @unchecked Sendable {
         let path = context.workingDirectory.path
         let home = context.home.path
         let short = path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
-        return "\(short) $ "
+        return "\(short) % "
     }
 
     public var iosSystemReady: Bool {

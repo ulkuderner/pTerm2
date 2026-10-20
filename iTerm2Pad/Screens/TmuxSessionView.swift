@@ -46,23 +46,22 @@ struct TmuxSessionView: View {
         }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                Button(String(localized: "Pad.Tmux.NewWindow",
-                              defaultValue: "New Window",
-                              comment: "Creates a tmux window")) {
-                    session.tmux.gateway.newWindow()
-                }
-                Button(String(localized: "Pad.Tmux.SplitH",
-                              defaultValue: "Split →",
-                              comment: "Splits the current tmux pane horizontally")) {
-                    if let pane = selectedPane {
-                        session.tmux.gateway.splitWindow(horizontal: true, target: pane)
-                    }
-                }
-                Button(String(localized: "Pad.Tmux.SplitV",
-                              defaultValue: "Split ↓",
-                              comment: "Splits the current tmux pane vertically")) {
+                Button("h") { movePane("select-pane -L") }
+                Button("j") { movePane("select-pane -D") }
+                Button("k") { movePane("select-pane -U") }
+                Button("l") { movePane("select-pane -R") }
+                Button(String(localized: "Pad.Tmux.SplitVKey",
+                              defaultValue: "−",
+                              comment: "prefix - splits the pane with a horizontal line, matching the embedded tmux standard")) {
                     if let pane = selectedPane {
                         session.tmux.gateway.splitWindow(horizontal: false, target: pane)
+                    }
+                }
+                Button(String(localized: "Pad.Tmux.SplitHKey",
+                              defaultValue: "_",
+                              comment: "prefix _ splits the pane with a vertical line, matching the embedded tmux standard")) {
+                    if let pane = selectedPane {
+                        session.tmux.gateway.splitWindow(horizontal: true, target: pane)
                     }
                 }
                 Button(String(localized: "Pad.Tmux.Detach",
@@ -92,6 +91,10 @@ struct TmuxSessionView: View {
             }
         }
         .id(windowsTick)
+    }
+
+    private func movePane(_ command: String) {
+        session.tmux.gateway.sendFireAndForget(command)
     }
 
     private var currentWindow: TmuxWindow? {

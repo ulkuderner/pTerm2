@@ -123,7 +123,7 @@ final class LiveSession {
     func start() throws {
         try ssh.connect(host: host, privateKeyPEM: privateKeyPEM, password: password)
         if host.wantsTmuxControl && !host.remoteCommand.isEmpty {
-            try ssh.exec(host.remoteCommand, columns: 80, rows: 24)
+            try ssh.exec(TmuxStandard.launchCommand(remoteCommand: host.remoteCommand), columns: 80, rows: 24)
             tmux.attach { [weak self] command in
                 self?.ssh.write(Data(command.utf8))
             }

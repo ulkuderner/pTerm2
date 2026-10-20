@@ -117,6 +117,13 @@ commands = File.join(APP_DIR, 'Resources', 'commandDictionary.plist')
 if File.exist?(commands)
   target.add_resources([app_group.new_reference(commands)])
 end
+tmux_dir = File.join(APP_DIR, 'Resources', 'tmux')
+if Dir.exist?(tmux_dir)
+  tmux_group = app_group.new_group('tmux', tmux_dir)
+  Dir.glob(File.join(tmux_dir, '*')).sort.each do |path|
+    target.add_resources([tmux_group.new_reference(path)])
+  end
+end
 
 link_package_product(project, target, tmux_pkg, 'TmuxControl')
 link_package_product(project, target, ssh_pkg, 'SSHClient')

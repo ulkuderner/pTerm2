@@ -6,7 +6,10 @@ New Features:
   so the Mac does not need to be on.
 - Connect with tmux control mode
   (tmux -CC). Windows become tabs
-  and panes become splits.
+  and panes become splits. The
+  embedded tmux standard uses the
+  usual prefix shortcuts, and each
+  pane starts a login zsh.
 - The local shell includes the Blink
   / ios_system command set, plus
   git, scp, sshfs, python3, and

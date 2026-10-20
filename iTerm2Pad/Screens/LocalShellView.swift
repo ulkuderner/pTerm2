@@ -11,24 +11,25 @@ struct LocalShellView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    Text(buffer)
-                        .font(.body.monospaced())
-                        .frame(maxWidth: .infinity, alignment: .leading)
+            GeometryReader { geo in
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(buffer)
+                                .font(.body.monospaced())
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .textSelection(.enabled)
+                            promptLine
+                                .id(Self.bottomID)
+                        }
                         .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .textSelection(.enabled)
-                    Color.clear
-                        .frame(height: 1)
-                        .id(Self.bottomID)
-                }
-                .scrollDismissesKeyboard(.interactively)
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    commandBar
-                }
-                .onChange(of: buffer) { _, _ in
-                    followBottom(with: proxy)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity, minHeight: geo.size.height, alignment: .bottom)
+                    }
+                    .scrollDismissesKeyboard(.interactively)
+                    .onChange(of: buffer) { _, _ in
+                        followBottom(with: proxy)
+                    }
                 }
             }
             .background(Color(.systemBackground))
@@ -53,11 +54,10 @@ struct LocalShellView: View {
         }
     }
 
-    private var commandBar: some View {
-        HStack(alignment: .center, spacing: 8) {
-            Text(session?.prompt() ?? "$ ")
+    private var promptLine: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 0) {
+            Text(session?.prompt() ?? "% ")
                 .font(.body.monospaced())
-                .foregroundStyle(.secondary)
             TextField(String(localized: "Pad.Shell.Command",
                              defaultValue: "Command",
                              comment: "Placeholder in the local-shell input field"),
@@ -71,9 +71,7 @@ struct LocalShellView: View {
                     runLine()
                 }
         }
-        .padding(.horizontal, 16)
-        .frame(minHeight: 44)
-        .background(.bar)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
     }
 
     private func followBottom(with proxy: ScrollViewProxy) {
