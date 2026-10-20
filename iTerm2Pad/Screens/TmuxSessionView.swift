@@ -22,6 +22,12 @@ struct TmuxSessionView: View {
                     },
                     onSize: { cols, rows in
                         session.resize(columns: cols, rows: rows)
+                    },
+                    onSplitVertical: { pane in
+                        session.tmux.gateway.splitWindow(horizontal: true, target: pane)
+                    },
+                    onSplitHorizontal: { pane in
+                        session.tmux.gateway.splitWindow(horizontal: false, target: pane)
                     }
                 )
             } else {
@@ -129,6 +135,8 @@ struct TmuxSplitView: View {
     var onSelect: (Int) -> Void
     var onSendText: (String, Int) -> Void
     var onSize: (Int, Int) -> Void
+    var onSplitVertical: (Int) -> Void
+    var onSplitHorizontal: (Int) -> Void
 
     var body: some View {
         switch node.type {
@@ -142,7 +150,9 @@ struct TmuxSplitView: View {
                                   selectedPane: selectedPane,
                                   onSelect: onSelect,
                                   onSendText: onSendText,
-                                  onSize: onSize)
+                                  onSize: onSize,
+                                  onSplitVertical: onSplitVertical,
+                                  onSplitHorizontal: onSplitHorizontal)
                 }
             }
         case .vSplit:
@@ -153,7 +163,9 @@ struct TmuxSplitView: View {
                                   selectedPane: selectedPane,
                                   onSelect: onSelect,
                                   onSendText: onSendText,
-                                  onSize: onSize)
+                                  onSize: onSize,
+                                  onSplitVertical: onSplitVertical,
+                                  onSplitHorizontal: onSplitHorizontal)
                 }
             }
         }
@@ -169,6 +181,8 @@ struct TmuxSplitView: View {
                 }
             },
             onSize: onSize,
+            onSplitVertical: { onSplitVertical(pane) },
+            onSplitHorizontal: { onSplitHorizontal(pane) },
             feed: feeds[pane]
         )
         .overlay {

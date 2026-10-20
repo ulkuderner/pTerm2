@@ -99,7 +99,7 @@ public final class TmuxGateway: @unchecked Sendable {
 
     public func splitWindow(horizontal: Bool, target pane: Int) {
         let flag = horizontal ? "-h" : "-v"
-        sendFireAndForget("split-window \(flag) -t %\(pane)")
+        sendFireAndForget("split-window \(flag) -c \"#{pane_current_path}\" -t %\(pane)")
     }
 
     public func selectPane(_ pane: Int) {

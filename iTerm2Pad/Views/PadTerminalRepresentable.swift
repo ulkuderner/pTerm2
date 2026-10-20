@@ -1,29 +1,37 @@
-import SwiftUI
 import SwiftTerm
+import SwiftUI
 import UIKit
 
 struct PadTerminalRepresentable: UIViewRepresentable {
     var onSend: (Data) -> Void
     var onSize: (Int, Int) -> Void
+    var onSplitVertical: () -> Void
+    var onSplitHorizontal: () -> Void
     var feed: Data?
 
     func makeCoordinator() -> Coordinator {
         Coordinator(onSend: onSend, onSize: onSize)
     }
 
-    func makeUIView(context: Context) -> TerminalView {
-        let view = TerminalView(frame: .zero)
-        view.terminalDelegate = context.coordinator
-        view.backgroundColor = .black
-        context.coordinator.terminal = view
-        return view
+    func makeUIView(context: Context) -> PadTerminalHost {
+        let host = PadTerminalHost(frame: .zero)
+        host.terminal.terminalDelegate = context.coordinator
+        host.onSplitVertical = onSplitVertical
+        host.onSplitHorizontal = onSplitHorizontal
+        host.applyCurrentTheme()
+        context.coordinator.terminal = host.terminal
+        context.coordinator.observeTheme(host)
+        host.terminal.becomeFirstResponder()
+        return host
     }
 
-    func updateUIView(_ uiView: TerminalView, context: Context) {
+    func updateUIView(_ uiView: PadTerminalHost, context: Context) {
         context.coordinator.onSend = onSend
         context.coordinator.onSize = onSize
+        uiView.onSplitVertical = onSplitVertical
+        uiView.onSplitHorizontal = onSplitHorizontal
         if let feed, !feed.isEmpty {
-            uiView.feed(byteArray: ArraySlice(feed))
+            uiView.terminal.feed(byteArray: ArraySlice(feed))
         }
     }
 
@@ -31,10 +39,21 @@ struct PadTerminalRepresentable: UIViewRepresentable {
         var onSend: (Data) -> Void
         var onSize: (Int, Int) -> Void
         weak var terminal: TerminalView?
+        private var themeObserver: NSObjectProtocol?
 
         init(onSend: @escaping (Data) -> Void, onSize: @escaping (Int, Int) -> Void) {
             self.onSend = onSend
             self.onSize = onSize
+        }
+
+        func observeTheme(_ host: PadTerminalHost) {
+            themeObserver = NotificationCenter.default.addObserver(
+                forName: .terminalThemeChanged,
+                object: nil,
+                queue: .main
+            ) { [weak host] _ in
+                host?.applyCurrentTheme()
+            }
         }
 
         func send(source: TerminalView, data: ArraySlice<UInt8>) {

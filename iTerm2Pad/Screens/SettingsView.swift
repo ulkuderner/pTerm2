@@ -3,9 +3,26 @@ import SSHClient
 import LocalShell
 
 struct SettingsView: View {
+    @State private var themeID = TerminalTheme.current.id
+
     var body: some View {
         NavigationStack {
             Form {
+                Section(String(localized: "Pad.Settings.Theme",
+                               defaultValue: "Theme",
+                               comment: "Settings section heading for the terminal color theme")) {
+                    Picker(String(localized: "Pad.Settings.Theme",
+                                  defaultValue: "Theme",
+                                  comment: "Settings section heading for the terminal color theme"),
+                           selection: $themeID) {
+                        ForEach(TerminalTheme.allCases) { theme in
+                            Text(theme.title).tag(theme.id)
+                        }
+                    }
+                    .onChange(of: themeID) { _, newValue in
+                        TerminalTheme.current = TerminalTheme.allCases.first { $0.id == newValue } ?? .linux
+                    }
+                }
                 Section(String(localized: "Pad.Settings.Backends",
                                defaultValue: "Backends",
                                comment: "Settings section heading for optional native frameworks")) {

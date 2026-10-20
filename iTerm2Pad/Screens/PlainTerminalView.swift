@@ -11,6 +11,8 @@ struct PlainTerminalView: View {
             PadTerminalRepresentable(
                 onSend: { session.send($0) },
                 onSize: { cols, rows in session.resize(columns: cols, rows: rows) },
+                onSplitVertical: { TmuxSplits.split(verticalDivider: true) },
+                onSplitHorizontal: { TmuxSplits.split(verticalDivider: false) },
                 feed: incoming
             )
             .focused($focused)

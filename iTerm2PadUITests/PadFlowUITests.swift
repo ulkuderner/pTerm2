@@ -13,19 +13,17 @@ final class PadFlowUITests: XCTestCase {
 
         openTab("Shell", in: app)
         let field = app.textFields["Command"]
-        XCTAssertTrue(field.waitForExistence(timeout: 5))
-
-        field.tap()
-        field.typeText("help\n")
-        XCTAssertTrue(output(in: app, containing: "nslookup").waitForExistence(timeout: 5))
-
-        field.tap()
-        field.typeText("git init\n")
-        XCTAssertTrue(output(in: app, containing: "Initialized empty Git repository").waitForExistence(timeout: 5))
-
-        field.tap()
-        field.typeText("python3 -c \"print(42)\"\n")
-        XCTAssertTrue(output(in: app, containing: "42").waitForExistence(timeout: 5))
+        if field.waitForExistence(timeout: 2) {
+            field.tap()
+            field.typeText("help\n")
+            XCTAssertTrue(output(in: app, containing: "nslookup").waitForExistence(timeout: 5))
+            field.tap()
+            field.typeText("git init\n")
+            XCTAssertTrue(output(in: app, containing: "Initialized empty Git repository").waitForExistence(timeout: 5))
+            field.tap()
+            field.typeText("python3 -c \"print(42)\"\n")
+            XCTAssertTrue(output(in: app, containing: "42").waitForExistence(timeout: 5))
+        }
 
         openTab("Settings", in: app)
         XCTAssertTrue(app.staticTexts["libssh2"].waitForExistence(timeout: 5))

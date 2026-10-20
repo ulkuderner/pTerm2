@@ -1,99 +1,79 @@
+import SwiftTerm
 import SwiftUI
-import LocalShell
+import UIKit
 
 struct LocalShellView: View {
-    @Environment(AppModel.self) private var model
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var session: ShellSession?
-    @State private var buffer = ""
-    @State private var line = ""
-    @FocusState private var commandFocused: Bool
-
     var body: some View {
         NavigationStack {
-            GeometryReader { geo in
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 0) {
-                            Text(buffer)
-                                .font(.body.monospaced())
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .textSelection(.enabled)
-                            promptLine
-                                .id(Self.bottomID)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .frame(maxWidth: .infinity, minHeight: geo.size.height, alignment: .bottom)
-                    }
-                    .scrollDismissesKeyboard(.interactively)
-                    .onChange(of: buffer) { _, _ in
-                        followBottom(with: proxy)
-                    }
-                }
-            }
-            .background(Color(.systemBackground))
-            .navigationTitle(String(localized: "Pad.Shell.Title",
-                                    defaultValue: "Shell",
-                                    comment: "Navigation title of the local shell"))
-            .navigationBarTitleDisplayMode(.inline)
-            .onAppear {
-                if session == nil {
-                    let shell = ShellSession(home: model.documents)
-                    shell.output = { text in
-                        buffer.append(text)
-                    }
-                    let banner = String(localized: "Pad.Shell.Banner",
-                                        defaultValue: "pTerm2 local shell. Type help for commands. python3, pip3, git, scp, and sshfs are available.\n",
-                                        comment: "First line printed when the local shell opens")
-                    buffer.append(banner)
-                    session = shell
-                }
-                commandFocused = true
-            }
+            ZshTerminalRepresentable()
+                .background(Color.black)
+                .navigationTitle(String(localized: "Pad.Shell.Title",
+                                        defaultValue: "Shell",
+                                        comment: "Navigation title of the local shell"))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbarBackground(Color.black, for: .navigationBar)
+                .toolbarColorScheme(.dark, for: .navigationBar)
         }
     }
+}
 
-    private var promptLine: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 0) {
-            Text(session?.prompt() ?? "% ")
-                .font(.body.monospaced())
-            TextField(String(localized: "Pad.Shell.Command",
-                             defaultValue: "Command",
-                             comment: "Placeholder in the local-shell input field"),
-                      text: $line)
-                .font(.body.monospaced())
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .focused($commandFocused)
-                .submitLabel(.go)
-                .onSubmit {
-                    runLine()
-                }
-        }
-        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+private struct ZshTerminalRepresentable: UIViewRepresentable {
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
     }
 
-    private func followBottom(with proxy: ScrollViewProxy) {
-        if reduceMotion {
-            proxy.scrollTo(Self.bottomID, anchor: .bottom)
-        } else {
-            withAnimation(.spring(response: 0.4, dampingFraction: 1)) {
-                proxy.scrollTo(Self.bottomID, anchor: .bottom)
+    func makeUIView(context: Context) -> PadTerminalHost {
+        let host = PadTerminalHost(frame: .zero)
+        host.terminal.terminalDelegate = context.coordinator
+        host.applyCurrentTheme()
+        host.onSplitVertical = { TmuxSplits.split(verticalDivider: true) }
+        host.onSplitHorizontal = { TmuxSplits.split(verticalDivider: false) }
+        context.coordinator.attach(host)
+        context.coordinator.session.start()
+        host.terminal.becomeFirstResponder()
+        return host
+    }
+
+    func updateUIView(_ uiView: PadTerminalHost, context: Context) {}
+
+    static func dismantleUIView(_ uiView: PadTerminalHost, coordinator: Coordinator) {
+        coordinator.session.stop()
+    }
+
+    final class Coordinator: NSObject, TerminalViewDelegate {
+        let session = ZshSession()
+        private var themeObserver: NSObjectProtocol?
+
+        func attach(_ host: PadTerminalHost) {
+            session.onOutput = { [weak host] data in
+                host?.terminal.feed(byteArray: ArraySlice(data))
+            }
+            themeObserver = NotificationCenter.default.addObserver(
+                forName: .terminalThemeChanged,
+                object: nil,
+                queue: .main
+            ) { [weak host] _ in
+                host?.applyCurrentTheme()
             }
         }
-    }
 
-    private func runLine() {
-        guard let session else {
-            return
+        func send(source: TerminalView, data: ArraySlice<UInt8>) {
+            session.send(Data(data))
         }
-        buffer.append(session.prompt() + line + "\n")
-        _ = session.run(line)
-        line = ""
-        commandFocused = true
-        model.consumePendingSSHLaunch()
-    }
 
-    private static let bottomID = "shell-bottom"
+        func sizeChanged(source: TerminalView, newCols: Int, newRows: Int) {
+            session.resize(columns: newCols, rows: newRows)
+        }
+
+        func setTerminalTitle(source: TerminalView, title: String) {}
+        func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
+        func scrolled(source: TerminalView, position: Double) {}
+        func requestOpenLink(source: TerminalView, link: String, params: [String: String]) {}
+        func clipboardCopy(source: TerminalView, content: Data) {
+            UIPasteboard.general.string = String(data: content, encoding: .utf8)
+        }
+        func rangeChanged(source: TerminalView, startY: Int, endY: Int) {}
+        func bell(source: TerminalView) {}
+        func iTermContent(source: TerminalView, content: ArraySlice<UInt8>) {}
+    }
 }
