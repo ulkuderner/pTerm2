@@ -313,7 +313,7 @@ final class ShellCanvas: UIView {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        backgroundColor = .black
+        backgroundColor = .opaqueSeparator
         clipsToBounds = true
     }
 
@@ -331,6 +331,10 @@ final class ShellCanvas: UIView {
                 host.removeFromSuperview()
             }
         }
+        for pane in chromes.keys where !alive.contains(pane) {
+            chromes[pane]?.removeFromSuperview()
+            chromes[pane] = nil
+        }
         for (pane, host) in hosts {
             host.pane = pane
             host.onClose = { [weak workspace] in workspace?.close(pane) }
@@ -340,8 +344,21 @@ final class ShellCanvas: UIView {
                 workspace?.focus(pane)
                 host?.claimKeyboard()
             }
-            host.terminal.layer.borderWidth = pane == focusedPane ? 2 : 0
-            host.terminal.layer.borderColor = UIColor.tintColor.cgColor
+            let chrome = self.chrome(for: pane)
+            let selected = pane == focusedPane
+            let split = hosts.count > 1
+            let heavy = traitCollection.accessibilityContrast == .high
+            let apply = {
+                chrome.apply(selected: selected, split: split, heavy: heavy)
+            }
+            if UIAccessibility.isReduceMotionEnabled {
+                apply()
+            } else {
+                UIView.animate(withDuration: 0.2,
+                               delay: 0,
+                               options: [.allowUserInteraction, .beginFromCurrentState],
+                               animations: apply)
+            }
         }
         if !hosts.values.contains(where: { $0.terminal.isFirstResponder }) {
             pendingFocus = true
@@ -372,6 +389,10 @@ final class ShellCanvas: UIView {
                 addSubview(host)
             }
             host.frame = rect.integral
+            if let chrome = chromes[pane] {
+                chrome.frame = host.frame
+                bringSubviewToFront(chrome)
+            }
         case .beside(let children):
             layout(children, in: rect, stacked: false)
         case .stacked(let children):
@@ -383,7 +404,7 @@ final class ShellCanvas: UIView {
         guard !children.isEmpty else {
             return
         }
-        let gaps = CGFloat(children.count - 1)
+        let gaps = CGFloat(children.count - 1) * Self.separatorGap
         var origin = stacked ? rect.minY : rect.minX
         let span = stacked ? rect.height : rect.width
         let share = (span - gaps) / CGFloat(children.count)
@@ -394,7 +415,64 @@ final class ShellCanvas: UIView {
                 ? CGRect(x: rect.minX, y: origin, width: rect.width, height: length)
                 : CGRect(x: origin, y: rect.minY, width: length, height: rect.height)
             layout(child, in: piece)
-            origin += length + 1
+            origin += length + Self.separatorGap
         }
+    }
+
+    private var chromes: [UUID: PaneChrome] = [:]
+
+    private static let separatorGap: CGFloat = 3
+
+    private func chrome(for pane: UUID) -> PaneChrome {
+        if let chrome = chromes[pane] {
+            return chrome
+        }
+        let chrome = PaneChrome(frame: .zero)
+        chromes[pane] = chrome
+        addSubview(chrome)
+        return chrome
+    }
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        let heavy = traitCollection.accessibilityContrast == .high
+        let split = hosts.count > 1
+        for (pane, chrome) in chromes {
+            chrome.apply(selected: pane == focusedPane, split: split, heavy: heavy)
+        }
+    }
+}
+
+/// Focus ring and dimming sit above the terminal and do not take taps.
+private final class PaneChrome: UIView {
+    private let dim = UIView()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        isUserInteractionEnabled = false
+        isAccessibilityElement = false
+        backgroundColor = .clear
+        layer.cornerCurve = .continuous
+        dim.backgroundColor = .black
+        dim.alpha = 0
+        dim.isUserInteractionEnabled = false
+        addSubview(dim)
+    }
+
+    required init?(coder: NSCoder) {
+        it_fatalError("PaneChrome is built in code")
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        dim.frame = bounds
+    }
+
+    func apply(selected: Bool, split: Bool, heavy: Bool) {
+        let marked = split && selected
+        dim.alpha = split && !selected ? (heavy ? 0.42 : 0.26) : 0
+        layer.borderWidth = marked ? (heavy ? 3 : 2) : 0
+        layer.borderColor = UIColor.tintColor.cgColor
+        layer.cornerRadius = marked ? 8 : 0
     }
 }

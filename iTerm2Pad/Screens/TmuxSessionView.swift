@@ -1,5 +1,6 @@
 import SwiftUI
 import TmuxControl
+import UIKit
 
 struct TmuxSessionView: View {
     var session: LiveSession
@@ -138,43 +139,46 @@ struct TmuxSplitView: View {
     var onSize: (Int, Int) -> Void
     var onSplitVertical: (Int) -> Void
     var onSplitHorizontal: (Int) -> Void
+    var inSplit = false
 
     var body: some View {
         switch node.type {
         case .leaf:
             paneView(node)
         case .hSplit:
-            VStack(spacing: 1) {
+            VStack(spacing: 3) {
                 ForEach(Array(node.children.enumerated()), id: \.offset) { _, child in
-                    TmuxSplitView(node: child,
-                                  feeds: feeds,
-                                  selectedPane: selectedPane,
-                                  onSelect: onSelect,
-                                  onSendText: onSendText,
-                                  onSize: onSize,
-                                  onSplitVertical: onSplitVertical,
-                                  onSplitHorizontal: onSplitHorizontal)
+                    splitChild(child)
                 }
             }
+            .background(Color(uiColor: .opaqueSeparator))
         case .vSplit:
-            HStack(spacing: 1) {
+            HStack(spacing: 3) {
                 ForEach(Array(node.children.enumerated()), id: \.offset) { _, child in
-                    TmuxSplitView(node: child,
-                                  feeds: feeds,
-                                  selectedPane: selectedPane,
-                                  onSelect: onSelect,
-                                  onSendText: onSendText,
-                                  onSize: onSize,
-                                  onSplitVertical: onSplitVertical,
-                                  onSplitHorizontal: onSplitHorizontal)
+                    splitChild(child)
                 }
             }
+            .background(Color(uiColor: .opaqueSeparator))
         }
+    }
+
+    private func splitChild(_ child: TmuxLayoutNode) -> some View {
+        TmuxSplitView(node: child,
+                      feeds: feeds,
+                      selectedPane: selectedPane,
+                      onSelect: onSelect,
+                      onSendText: onSendText,
+                      onSize: onSize,
+                      onSplitVertical: onSplitVertical,
+                      onSplitHorizontal: onSplitHorizontal,
+                      inSplit: true)
     }
 
     @ViewBuilder
     private func paneView(_ node: TmuxLayoutNode) -> some View {
         let pane = node.windowPane ?? 0
+        let selected = pane == selectedPane
+        let heavy = UIAccessibility.isDarkerSystemColorsEnabled
         PadTerminalRepresentable(
             onSend: { data in
                 if let text = String(data: data, encoding: .utf8) {
@@ -187,9 +191,17 @@ struct TmuxSplitView: View {
             feed: feeds[pane]
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 2)
-                .stroke(pane == selectedPane ? Color.accentColor : Color.clear, lineWidth: 2)
+            ZStack {
+                if inSplit && !selected {
+                    Color.black.opacity(heavy ? 0.42 : 0.26)
+                }
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(inSplit && selected ? Color.accentColor : Color.clear,
+                                  lineWidth: heavy ? 3 : 2)
+            }
+            .allowsHitTesting(false)
         }
+        .animation(UIAccessibility.isReduceMotionEnabled ? nil : .easeOut(duration: 0.2), value: selected)
         .onTapGesture {
             onSelect(pane)
         }
