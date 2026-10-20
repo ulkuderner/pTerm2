@@ -28,7 +28,7 @@ public struct SSHFSMount: Equatable, Sendable, Codable, Identifiable {
 }
 
 public enum SSHFSMountStore {
-    public static let suiteName = "group.com.googlecode.iterm2.pad"
+    public static let suiteName = "group.com.caglar.pTerm2"
     public static let mountsKey = "NoSyncSSHFSMounts"
 
     public static func load() -> [SSHFSMount] {

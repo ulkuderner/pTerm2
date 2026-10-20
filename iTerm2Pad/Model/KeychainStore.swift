@@ -6,7 +6,7 @@ import SSHClient
 /// under a NoSync key so a custom prefs location is not prompted.
 final class KeychainStore {
     static let identitiesDefaultsKey = "NoSyncSSHIdentities"
-    private let service = "com.googlecode.iterm2.pad.ssh-keys"
+    private let service = "com.caglar.pTerm2.ssh-keys"
 
     func identities() -> [SSHIdentity] {
         let defaults = UserDefaults.standard
