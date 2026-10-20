@@ -1,6 +1,48 @@
 import SwiftUI
 import TmuxControl
 
+struct TerminalKeyboardToggle: ViewModifier {
+    @State private var shown = TerminalChrome.showKeys
+
+    func body(content: Content) -> some View {
+        content
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(shown
+                           ? String(localized: "Pad.Key.Hide",
+                                    defaultValue: "Hide Keys",
+                                    comment: "Hides the Esc and arrow bar under the terminal")
+                           : String(localized: "Pad.Key.Show",
+                                    defaultValue: "Show Keys",
+                                    comment: "Shows the Esc and arrow bar under the terminal")) {
+                        TerminalChrome.showKeys.toggle()
+                        shown = TerminalChrome.showKeys
+                    }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: TerminalChrome.changed)) { _ in
+                shown = TerminalChrome.showKeys
+            }
+    }
+}
+
+struct OptionalKeyboardAccessory: View {
+    var onKey: (TmuxKeyName.Special) -> Void
+    var onControlC: () -> Void
+    @State private var shown = TerminalChrome.showKeys
+
+    var body: some View {
+        Group {
+            if shown {
+                KeyboardAccessory(onKey: onKey, onControlC: onControlC)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: TerminalChrome.changed)) { _ in
+            shown = TerminalChrome.showKeys
+        }
+    }
+}
+
 struct KeyboardAccessory: View {
     var onKey: (TmuxKeyName.Special) -> Void
     var onControlC: () -> Void

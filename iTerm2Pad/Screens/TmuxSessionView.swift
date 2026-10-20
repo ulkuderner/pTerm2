@@ -37,7 +37,7 @@ struct TmuxSessionView: View {
                                 comment: "Placeholder while the first %layout-change has not arrived"))
                 }
             }
-            KeyboardAccessory(
+            OptionalKeyboardAccessory(
                 onKey: { special in
                     if let pane = selectedPane {
                         session.sendTmuxKey(TmuxKeyName.namedSpecial(special), pane: pane)
@@ -50,6 +50,7 @@ struct TmuxSessionView: View {
                 }
             )
         }
+        .modifier(TerminalKeyboardToggle())
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button("h") { movePane("select-pane -L") }

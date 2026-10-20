@@ -16,7 +16,7 @@ struct PlainTerminalView: View {
                 feed: incoming
             )
             .focused($focused)
-            KeyboardAccessory(
+            OptionalKeyboardAccessory(
                 onKey: { special in
                     session.send(Data(byteSequence(for: special)))
                 },
@@ -25,6 +25,7 @@ struct PlainTerminalView: View {
                 }
             )
         }
+        .modifier(TerminalKeyboardToggle())
         .onAppear {
             focused = true
             session.onPlainOutput = { data in

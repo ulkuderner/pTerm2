@@ -13,6 +13,7 @@ struct LocalShellView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbarBackground(Color.black, for: .navigationBar)
                 .toolbarColorScheme(.dark, for: .navigationBar)
+                .modifier(TerminalKeyboardToggle())
         }
     }
 }

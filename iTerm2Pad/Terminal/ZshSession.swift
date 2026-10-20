@@ -145,7 +145,9 @@ final class ZshSession {
             "LOGNAME=\(user)",
             "SHELL=/bin/zsh",
             "TERM=xterm-256color",
+            "COLORTERM=truecolor",
             "LANG=en_US.UTF-8",
+            "LC_ALL=en_US.UTF-8",
             "PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
         ]
         if !zshRoot.isEmpty {

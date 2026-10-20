@@ -117,6 +117,13 @@ commands = File.join(APP_DIR, 'Resources', 'commandDictionary.plist')
 if File.exist?(commands)
   target.add_resources([app_group.new_reference(commands)])
 end
+fonts_dir = File.join(APP_DIR, 'Resources', 'Fonts')
+if Dir.exist?(fonts_dir)
+  fonts_group = app_group.new_group('Fonts', fonts_dir)
+  Dir.glob(File.join(fonts_dir, '*.ttf')).sort.each do |path|
+    target.add_resources([fonts_group.new_reference(path)])
+  end
+end
 tmux_dir = File.join(APP_DIR, 'Resources', 'tmux')
 if Dir.exist?(tmux_dir)
   tmux_group = app_group.new_group('tmux', tmux_dir)
