@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import LocalShell
 
 /// Interactive login zsh on a pseudoterminal. The prompt and command line are
 /// drawn by zsh itself, so the screen is a terminal rather than a text field.
@@ -16,6 +17,12 @@ final class ZshSession {
     private var watch: DispatchSourceProcess?
     private var started = false
     private var exited = false
+    /// Used when iPadOS refuses openpty. Commands run inside the app sandbox.
+    private var builtin: ShellSession?
+    private var line = ""
+    private var history: [String] = []
+    private var historyCursor = 0
+    private var pendingEscape = ""
 
     static var accountHome: String {
         if let users = try? FileManager.default.contentsOfDirectory(atPath: "/Users") {
@@ -34,11 +41,16 @@ final class ZshSession {
             return
         }
         started = true
+        let zshBinary = "/bin/zsh"
+        guard FileManager.default.isExecutableFile(atPath: zshBinary) else {
+            startBuiltin()
+            return
+        }
         var masterFD: Int32 = -1
         var slaveFD: Int32 = -1
         var size = winsize(ws_row: rows, ws_col: columns, ws_xpixel: 0, ws_ypixel: 0)
         guard openpty(&masterFD, &slaveFD, nil, nil, &size) == 0 else {
-            emit("zsh: openpty failed (\(errno))\r\n")
+            startBuiltin()
             return
         }
         master = masterFD
@@ -88,9 +100,9 @@ final class ZshSession {
         }
         close(slaveFD)
         guard result == 0 else {
-            emit("zsh: could not start (\(result))\r\n")
             close(masterFD)
             master = -1
+            startBuiltin()
             return
         }
         child = pid
@@ -114,6 +126,10 @@ final class ZshSession {
     }
 
     func send(_ data: Data) {
+        if builtin != nil {
+            acceptBuiltin(data)
+            return
+        }
         guard master >= 0, !data.isEmpty else {
             return
         }
@@ -135,6 +151,7 @@ final class ZshSession {
 
     func stop() {
         onExit = nil
+        builtin = nil
         master = -1
         reader?.cancel()
         reader = nil
@@ -173,6 +190,106 @@ final class ZshSession {
         }
         exited = true
         onExit?()
+    }
+
+    /// Line editor for the iPad sandbox. iPadOS returns EPERM from openpty and
+    /// does not ship /bin/zsh, so the embedded command set runs in-process.
+    private func startBuiltin() {
+        let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+        let shell = ShellSession(home: home)
+        shell.output = { [weak self] text in
+            self?.writeTerminal(text)
+        }
+        builtin = shell
+        writeTerminal(String(localized: "Pad.Shell.Sandbox",
+                             defaultValue: "iPad sandbox shell. zsh cannot open a terminal here, so built-in commands are running. Type help.\r\n",
+                             comment: "Banner when the iPad sandbox cannot start zsh."))
+        if let launchProgram {
+            writeTerminal("\(launchProgram) is not available in the iPad sandbox.\r\n")
+        } else if let missingNotice {
+            writeTerminal(missingNotice + "\r\n")
+        }
+        writeTerminal(shell.prompt())
+    }
+
+    private func acceptBuiltin(_ data: Data) {
+        for byte in data {
+            if !pendingEscape.isEmpty || byte == 0x1b {
+                pendingEscape.append(Character(UnicodeScalar(byte)))
+                if pendingEscape.count > 1, let last = pendingEscape.last, last.isLetter || last == "~" {
+                    handleEscape(pendingEscape)
+                    pendingEscape = ""
+                }
+                continue
+            }
+            switch byte {
+            case 0x0d, 0x0a:
+                writeTerminal("\r\n")
+                let command = line
+                if !command.isEmpty {
+                    history.append(command)
+                }
+                historyCursor = history.count
+                line = ""
+                _ = builtin?.run(command)
+                writeTerminal(builtin?.prompt() ?? "")
+            case 0x7f, 0x08:
+                guard !line.isEmpty else { continue }
+                line.removeLast()
+                writeTerminal("\u{8} \u{8}")
+            case 0x03:
+                line = ""
+                writeTerminal("^C\r\n")
+                writeTerminal(builtin?.prompt() ?? "")
+            case 0x15:
+                line = ""
+                writeTerminal("\r\n")
+                writeTerminal(builtin?.prompt() ?? "")
+            case 32...126:
+                let character = String(UnicodeScalar(byte))
+                line.append(character)
+                writeTerminal(character)
+            default:
+                break
+            }
+        }
+    }
+
+    private func handleEscape(_ sequence: String) {
+        guard sequence == "\u{1b}[A" || sequence == "\u{1b}[B" else {
+            return
+        }
+        if sequence == "\u{1b}[A" {
+            guard historyCursor > 0 else { return }
+            historyCursor -= 1
+        } else if historyCursor < history.count {
+            historyCursor += 1
+        }
+        replaceLine(historyCursor < history.count ? history[historyCursor] : "")
+    }
+
+    private func replaceLine(_ next: String) {
+        if !line.isEmpty {
+            writeTerminal(String(repeating: "\u{8}", count: line.count))
+            writeTerminal(String(repeating: " ", count: line.count))
+            writeTerminal(String(repeating: "\u{8}", count: line.count))
+        }
+        line = next
+        writeTerminal(next)
+    }
+
+    private func writeTerminal(_ text: String) {
+        let normalized = text
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\n", with: "\r\n")
+        let data = Data(normalized.utf8)
+        if Thread.isMainThread {
+            onOutput?(data)
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                self?.onOutput?(data)
+            }
+        }
     }
 
     private func emit(_ text: String) {
