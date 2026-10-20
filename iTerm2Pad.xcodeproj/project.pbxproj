@@ -1,0 +1,810 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0A3E6DA73F4CDA6812305D56 /* SSHClient in Frameworks */ = {isa = PBXBuildFile; productRef = 1185D75619D36A918DB91D12 /* SSHClient */; };
+		131C3774086551D39CD437BB /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 6A040A055E676B18AB9BC131 /* PrivacyInfo.xcprivacy */; };
+		137A3B94C1C14048783743D5 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A9034926949AB99A96E85B29 /* Foundation.framework */; };
+		145A2CA843ACF9937072AF17 /* TmuxControl in Frameworks */ = {isa = PBXBuildFile; productRef = 1378702B8951F1C0D71D1F87 /* TmuxControl */; };
+		1788D98243AB43C1C0AFF304 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CCFCA62F2BE0A4E964E3B2A /* KeychainStore.swift */; };
+		26884CE687124991E0AF3554 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED5CDC082F501ECE3F8327C1 /* SettingsView.swift */; };
+		3A694463CADB3540B384611C /* HostStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAFE3898409B2947964559A1 /* HostStore.swift */; };
+		3F795CC0A09652924062CE53 /* TmuxGatewayAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 743E8EAA11420E60A0E4E96C /* TmuxGatewayAppTests.swift */; };
+		415C8C49751801BD7C018DB0 /* HostListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9EC19DDB37C528BEFE92FEE /* HostListView.swift */; };
+		434AD85E407008CD6D952FAA /* HostEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4507852E0682FDE70852D04F /* HostEditorView.swift */; };
+		4A87C6F9EDF0D35E61C22C34 /* SessionContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89B81862C67F232611023F9D /* SessionContainerView.swift */; };
+		553C917ECA43DA163AF71EA3 /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 894C7C0413EC39D3FE22F0A4 /* SwiftTerm */; };
+		60C8C0ED29AA23E6D0A49E35 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A9034926949AB99A96E85B29 /* Foundation.framework */; };
+		64F0A8EE47FE091FC3AB6119 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A9034926949AB99A96E85B29 /* Foundation.framework */; };
+		7B5E2935C6B08EC7B8133EFF /* iTerm2PadApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E623550B066B1D585A36F35C /* iTerm2PadApp.swift */; };
+		81EAD3649E9C9EE9E2D0C9FC /* LocalShell in Frameworks */ = {isa = PBXBuildFile; productRef = 06B2BD584D575F790D8AAE03 /* LocalShell */; };
+		85B15466EA7899207F93635C /* iTerm2PadFileProvider.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B8EE847EA7D0C1DBC322A4D3 /* iTerm2PadFileProvider.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		A24E5DB676D84528A4F165F9 /* FileProviderExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E8C22941500C685934F8CE7 /* FileProviderExtension.swift */; };
+		A8E2A0BABC802325C04F2885 /* TmuxControl in Frameworks */ = {isa = PBXBuildFile; productRef = 82A72D1462130ADFF499ACA7 /* TmuxControl */; };
+		B4A2E045F6192E93F077E9EF /* KeysView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66A7C407B27815395AC417D5 /* KeysView.swift */; };
+		BB4E227F448633E100A86E4A /* LocalShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4142B8E20FE4D688F42E0016 /* LocalShellView.swift */; };
+		BB56DA9711AEFDB0F0D09EFB /* PadTerminalRepresentable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A4CFA3CC7CB89E8D8B72257 /* PadTerminalRepresentable.swift */; };
+		BC0C5FE7337A1D5B80E6DBA6 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1776D5C2F9A666CCE320939 /* AppModel.swift */; };
+		BC9FDA393D5C49B6BE196D9A /* TmuxSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADC8F1F7426D8DF20085F941 /* TmuxSessionView.swift */; };
+		C2DD9A11D987AAA94C6474E5 /* HostStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3F358827401223DC61D77E8 /* HostStoreTests.swift */; };
+		DC9D803E2596F9037A08CD1F /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B869FDEB5F02773A15B295A3 /* HomeView.swift */; };
+		E7173BF8E6A39054FAAA4D66 /* PadAssert.swift in Sources */ = {isa = PBXBuildFile; fileRef = 893E14366CA4ED8411D37119 /* PadAssert.swift */; };
+		E8F5AC5B9CFEF4A3D182D9F5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8E8FB4FC7F08DECDE63D00BE /* Assets.xcassets */; };
+		EF948A36BF0E851D76BB1960 /* SSHClient in Frameworks */ = {isa = PBXBuildFile; productRef = 0D0B82A826CC05037734D3D5 /* SSHClient */; };
+		F4BD498468A40998910C4457 /* LocalShell in Frameworks */ = {isa = PBXBuildFile; productRef = 03040F8E53CA4A90841747E7 /* LocalShell */; };
+		F871D4AA09AB81DBB824B881 /* KeyboardAccessory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25AD37AC3876C6D7F4B3A74A /* KeyboardAccessory.swift */; };
+		FA72C998AEDDF256AE9B16DB /* PlainTerminalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E615E99F0D3AE57370C61278 /* PlainTerminalView.swift */; };
+		FCE9BD529722BEE7F6875CE2 /* commandDictionary.plist in Resources */ = {isa = PBXBuildFile; fileRef = 5EC5C8326F3473A9A4E19C08 /* commandDictionary.plist */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		39864BD7843053106B05F623 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 422C991F7E2DF1168BCE4E2F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 209A008207D8C6DC90BA48DB;
+			remoteInfo = iTerm2PadFileProvider;
+		};
+		C6F20ACF0D303E2984D9E8A7 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 422C991F7E2DF1168BCE4E2F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8C683F856D109F165C3DA95A;
+			remoteInfo = iTerm2Pad;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		1A10CD7337303AAC693FAF01 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				85B15466EA7899207F93635C /* iTerm2PadFileProvider.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		1CCFCA62F2BE0A4E964E3B2A /* KeychainStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
+		25AD37AC3876C6D7F4B3A74A /* KeyboardAccessory.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeyboardAccessory.swift; sourceTree = "<group>"; };
+		3C16DC667F8ADD913BEF2293 /* iTerm2PadTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = iTerm2PadTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4142B8E20FE4D688F42E0016 /* LocalShellView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocalShellView.swift; sourceTree = "<group>"; };
+		4507852E0682FDE70852D04F /* HostEditorView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HostEditorView.swift; sourceTree = "<group>"; };
+		4E8C22941500C685934F8CE7 /* FileProviderExtension.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FileProviderExtension.swift; sourceTree = "<group>"; };
+		5EC5C8326F3473A9A4E19C08 /* commandDictionary.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; name = commandDictionary.plist; path = Resources/commandDictionary.plist; sourceTree = "<group>"; };
+		66A7C407B27815395AC417D5 /* KeysView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeysView.swift; sourceTree = "<group>"; };
+		6A040A055E676B18AB9BC131 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = Resources/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		743E8EAA11420E60A0E4E96C /* TmuxGatewayAppTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TmuxGatewayAppTests.swift; sourceTree = "<group>"; };
+		7A4CFA3CC7CB89E8D8B72257 /* PadTerminalRepresentable.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PadTerminalRepresentable.swift; sourceTree = "<group>"; };
+		821E9F588538E44A381BE811 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		893E14366CA4ED8411D37119 /* PadAssert.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PadAssert.swift; sourceTree = "<group>"; };
+		89B81862C67F232611023F9D /* SessionContainerView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SessionContainerView.swift; sourceTree = "<group>"; };
+		8E8FB4FC7F08DECDE63D00BE /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = Resources/Assets.xcassets; sourceTree = "<group>"; };
+		90CE20F8BB9AAFF100A14308 /* iTerm2Pad.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iTerm2Pad.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A9034926949AB99A96E85B29 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		ADC8F1F7426D8DF20085F941 /* TmuxSessionView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TmuxSessionView.swift; sourceTree = "<group>"; };
+		B869FDEB5F02773A15B295A3 /* HomeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		B8EE847EA7D0C1DBC322A4D3 /* iTerm2PadFileProvider.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = iTerm2PadFileProvider.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		D1776D5C2F9A666CCE320939 /* AppModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		D3F358827401223DC61D77E8 /* HostStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HostStoreTests.swift; sourceTree = "<group>"; };
+		DAFE3898409B2947964559A1 /* HostStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HostStore.swift; sourceTree = "<group>"; };
+		E615E99F0D3AE57370C61278 /* PlainTerminalView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlainTerminalView.swift; sourceTree = "<group>"; };
+		E623550B066B1D585A36F35C /* iTerm2PadApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = iTerm2PadApp.swift; sourceTree = "<group>"; };
+		E9EC19DDB37C528BEFE92FEE /* HostListView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HostListView.swift; sourceTree = "<group>"; };
+		ED5CDC082F501ECE3F8327C1 /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		1F90D79495C24B77E1F3475C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				60C8C0ED29AA23E6D0A49E35 /* Foundation.framework in Frameworks */,
+				81EAD3649E9C9EE9E2D0C9FC /* LocalShell in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		21185D12A8636CCEFE96F905 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				64F0A8EE47FE091FC3AB6119 /* Foundation.framework in Frameworks */,
+				A8E2A0BABC802325C04F2885 /* TmuxControl in Frameworks */,
+				0A3E6DA73F4CDA6812305D56 /* SSHClient in Frameworks */,
+				F4BD498468A40998910C4457 /* LocalShell in Frameworks */,
+				553C917ECA43DA163AF71EA3 /* SwiftTerm in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9649FEE362B49A7EB0F35C15 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				137A3B94C1C14048783743D5 /* Foundation.framework in Frameworks */,
+				145A2CA843ACF9937072AF17 /* TmuxControl in Frameworks */,
+				EF948A36BF0E851D76BB1960 /* SSHClient in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		1FA4A6952363649E4F8BD354 /* Model */ = {
+			isa = PBXGroup;
+			children = (
+				DAFE3898409B2947964559A1 /* HostStore.swift */,
+				1CCFCA62F2BE0A4E964E3B2A /* KeychainStore.swift */,
+			);
+			name = Model;
+			path = Model;
+			sourceTree = "<group>";
+		};
+		2DC69707387186C4F02B7B0E /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				F1A54EEEA4C2DA90EEE11656 /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		2F220532660FB98C05766ADF /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				B8EE847EA7D0C1DBC322A4D3 /* iTerm2PadFileProvider.appex */,
+				90CE20F8BB9AAFF100A14308 /* iTerm2Pad.app */,
+				3C16DC667F8ADD913BEF2293 /* iTerm2PadTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		51CC6D30CC29C0F745899387 /* iTerm2Pad */ = {
+			isa = PBXGroup;
+			children = (
+				A5640C645CFDC211C7470244 /* App */,
+				1FA4A6952363649E4F8BD354 /* Model */,
+				6785B69622370C6A247C88DB /* Screens */,
+				5D145E729C2C536C9988B47F /* Views */,
+				8E8FB4FC7F08DECDE63D00BE /* Assets.xcassets */,
+				6A040A055E676B18AB9BC131 /* PrivacyInfo.xcprivacy */,
+				5EC5C8326F3473A9A4E19C08 /* commandDictionary.plist */,
+			);
+			name = iTerm2Pad;
+			path = iTerm2Pad;
+			sourceTree = "<group>";
+		};
+		5D145E729C2C536C9988B47F /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				25AD37AC3876C6D7F4B3A74A /* KeyboardAccessory.swift */,
+				7A4CFA3CC7CB89E8D8B72257 /* PadTerminalRepresentable.swift */,
+			);
+			name = Views;
+			path = Views;
+			sourceTree = "<group>";
+		};
+		6785B69622370C6A247C88DB /* Screens */ = {
+			isa = PBXGroup;
+			children = (
+				B869FDEB5F02773A15B295A3 /* HomeView.swift */,
+				4507852E0682FDE70852D04F /* HostEditorView.swift */,
+				E9EC19DDB37C528BEFE92FEE /* HostListView.swift */,
+				66A7C407B27815395AC417D5 /* KeysView.swift */,
+				4142B8E20FE4D688F42E0016 /* LocalShellView.swift */,
+				E615E99F0D3AE57370C61278 /* PlainTerminalView.swift */,
+				89B81862C67F232611023F9D /* SessionContainerView.swift */,
+				ED5CDC082F501ECE3F8327C1 /* SettingsView.swift */,
+				ADC8F1F7426D8DF20085F941 /* TmuxSessionView.swift */,
+			);
+			name = Screens;
+			path = Screens;
+			sourceTree = "<group>";
+		};
+		68415E8EC47F13E037795091 /* iTerm2PadFileProvider */ = {
+			isa = PBXGroup;
+			children = (
+				4E8C22941500C685934F8CE7 /* FileProviderExtension.swift */,
+				821E9F588538E44A381BE811 /* Info.plist */,
+			);
+			name = iTerm2PadFileProvider;
+			path = iTerm2PadFileProvider;
+			sourceTree = "<group>";
+		};
+		71A82A8254106C1B9E72E7CB /* iTerm2PadTests */ = {
+			isa = PBXGroup;
+			children = (
+				D3F358827401223DC61D77E8 /* HostStoreTests.swift */,
+				743E8EAA11420E60A0E4E96C /* TmuxGatewayAppTests.swift */,
+			);
+			name = iTerm2PadTests;
+			path = iTerm2PadTests;
+			sourceTree = "<group>";
+		};
+		A5640C645CFDC211C7470244 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				D1776D5C2F9A666CCE320939 /* AppModel.swift */,
+				893E14366CA4ED8411D37119 /* PadAssert.swift */,
+				E623550B066B1D585A36F35C /* iTerm2PadApp.swift */,
+			);
+			name = App;
+			path = App;
+			sourceTree = "<group>";
+		};
+		BBD18DD1A52B7A6B1D8F0321 = {
+			isa = PBXGroup;
+			children = (
+				2F220532660FB98C05766ADF /* Products */,
+				2DC69707387186C4F02B7B0E /* Frameworks */,
+				68415E8EC47F13E037795091 /* iTerm2PadFileProvider */,
+				51CC6D30CC29C0F745899387 /* iTerm2Pad */,
+				71A82A8254106C1B9E72E7CB /* iTerm2PadTests */,
+			);
+			sourceTree = "<group>";
+		};
+		F1A54EEEA4C2DA90EEE11656 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				A9034926949AB99A96E85B29 /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		209A008207D8C6DC90BA48DB /* iTerm2PadFileProvider */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 99FC89B97AFD1CF333419964 /* Build configuration list for PBXNativeTarget "iTerm2PadFileProvider" */;
+			buildPhases = (
+				FD514A116EDB30DAB8B90DE3 /* Sources */,
+				1F90D79495C24B77E1F3475C /* Frameworks */,
+				C504EC6C25BEC241BBC7C79A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = iTerm2PadFileProvider;
+			packageProductDependencies = (
+				06B2BD584D575F790D8AAE03 /* LocalShell */,
+			);
+			productName = iTerm2PadFileProvider;
+			productReference = B8EE847EA7D0C1DBC322A4D3 /* iTerm2PadFileProvider.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		8C683F856D109F165C3DA95A /* iTerm2Pad */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 48C7470175762F301DEEC0C0 /* Build configuration list for PBXNativeTarget "iTerm2Pad" */;
+			buildPhases = (
+				8F3A02DC89826244E6968FD8 /* Sources */,
+				21185D12A8636CCEFE96F905 /* Frameworks */,
+				19437F79496FC332E39CFE7A /* Resources */,
+				1A10CD7337303AAC693FAF01 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				01FBE67FFA32C0F4724F3B27 /* PBXTargetDependency */,
+			);
+			name = iTerm2Pad;
+			packageProductDependencies = (
+				82A72D1462130ADFF499ACA7 /* TmuxControl */,
+				1185D75619D36A918DB91D12 /* SSHClient */,
+				03040F8E53CA4A90841747E7 /* LocalShell */,
+				894C7C0413EC39D3FE22F0A4 /* SwiftTerm */,
+			);
+			productName = iTerm2Pad;
+			productReference = 90CE20F8BB9AAFF100A14308 /* iTerm2Pad.app */;
+			productType = "com.apple.product-type.application";
+		};
+		9C72615F4AE84110CF2B456C /* iTerm2PadTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C38F060D47DC27E30D44C21B /* Build configuration list for PBXNativeTarget "iTerm2PadTests" */;
+			buildPhases = (
+				5D1A24F4FEDEDCD7703073CF /* Sources */,
+				9649FEE362B49A7EB0F35C15 /* Frameworks */,
+				45DCC14D4E396FC89387485C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				442CECD13819498EFF8B36F1 /* PBXTargetDependency */,
+			);
+			name = iTerm2PadTests;
+			packageProductDependencies = (
+				1378702B8951F1C0D71D1F87 /* TmuxControl */,
+				0D0B82A826CC05037734D3D5 /* SSHClient */,
+			);
+			productName = iTerm2PadTests;
+			productReference = 3C16DC667F8ADD913BEF2293 /* iTerm2PadTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		422C991F7E2DF1168BCE4E2F /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+			};
+			buildConfigurationList = DE2AE92D2E5B5D6F0409F924 /* Build configuration list for PBXProject "iTerm2Pad" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = BBD18DD1A52B7A6B1D8F0321;
+			minimizedProjectReferenceProxies = 0;
+			packageReferences = (
+				26002919A46929518D48A0CA /* XCLocalSwiftPackageReference "TmuxControl" */,
+				BB1140892F3CF07401F9047E /* XCLocalSwiftPackageReference "SSHClient" */,
+				34301A963AFAEB72CFCCF8D6 /* XCLocalSwiftPackageReference "LocalShell" */,
+				11645FFB5816D75EC6B9973A /* XCRemoteSwiftPackageReference "SwiftTerm" */,
+			);
+			preferredProjectObjectVersion = 100;
+			productRefGroup = 2F220532660FB98C05766ADF /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				209A008207D8C6DC90BA48DB /* iTerm2PadFileProvider */,
+				8C683F856D109F165C3DA95A /* iTerm2Pad */,
+				9C72615F4AE84110CF2B456C /* iTerm2PadTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		19437F79496FC332E39CFE7A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E8F5AC5B9CFEF4A3D182D9F5 /* Assets.xcassets in Resources */,
+				131C3774086551D39CD437BB /* PrivacyInfo.xcprivacy in Resources */,
+				FCE9BD529722BEE7F6875CE2 /* commandDictionary.plist in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		45DCC14D4E396FC89387485C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C504EC6C25BEC241BBC7C79A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		5D1A24F4FEDEDCD7703073CF /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C2DD9A11D987AAA94C6474E5 /* HostStoreTests.swift in Sources */,
+				3F795CC0A09652924062CE53 /* TmuxGatewayAppTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8F3A02DC89826244E6968FD8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BC0C5FE7337A1D5B80E6DBA6 /* AppModel.swift in Sources */,
+				E7173BF8E6A39054FAAA4D66 /* PadAssert.swift in Sources */,
+				7B5E2935C6B08EC7B8133EFF /* iTerm2PadApp.swift in Sources */,
+				3A694463CADB3540B384611C /* HostStore.swift in Sources */,
+				1788D98243AB43C1C0AFF304 /* KeychainStore.swift in Sources */,
+				DC9D803E2596F9037A08CD1F /* HomeView.swift in Sources */,
+				434AD85E407008CD6D952FAA /* HostEditorView.swift in Sources */,
+				415C8C49751801BD7C018DB0 /* HostListView.swift in Sources */,
+				B4A2E045F6192E93F077E9EF /* KeysView.swift in Sources */,
+				BB4E227F448633E100A86E4A /* LocalShellView.swift in Sources */,
+				FA72C998AEDDF256AE9B16DB /* PlainTerminalView.swift in Sources */,
+				4A87C6F9EDF0D35E61C22C34 /* SessionContainerView.swift in Sources */,
+				26884CE687124991E0AF3554 /* SettingsView.swift in Sources */,
+				BC9FDA393D5C49B6BE196D9A /* TmuxSessionView.swift in Sources */,
+				F871D4AA09AB81DBB824B881 /* KeyboardAccessory.swift in Sources */,
+				BB56DA9711AEFDB0F0D09EFB /* PadTerminalRepresentable.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FD514A116EDB30DAB8B90DE3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A24E5DB676D84528A4F165F9 /* FileProviderExtension.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		01FBE67FFA32C0F4724F3B27 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = iTerm2PadFileProvider;
+			target = 209A008207D8C6DC90BA48DB /* iTerm2PadFileProvider */;
+			targetProxy = 39864BD7843053106B05F623 /* PBXContainerItemProxy */;
+		};
+		442CECD13819498EFF8B36F1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = iTerm2Pad;
+			target = 8C683F856D109F165C3DA95A /* iTerm2Pad */;
+			targetProxy = C6F20ACF0D303E2984D9E8A7 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		0A368F95CB8C35E7F57AD1FA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = iTerm2PadFileProvider/iTerm2PadFileProvider.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = H7V7XYVQ7D;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = iTerm2PadFileProvider/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.googlecode.iterm2.pad.sshfs;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Debug;
+		};
+		2FC20EA71AC9A0C8090B6B8B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = H7V7XYVQ7D;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.googlecode.iterm2.pad.tests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/iTerm2Pad.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/iTerm2Pad";
+			};
+			name = Debug;
+		};
+		33E3BD43E60B76D92D1B06DB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		6D64E10CF3DF3C104BB21013 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = iTerm2PadFileProvider/iTerm2PadFileProvider.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = H7V7XYVQ7D;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = iTerm2PadFileProvider/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.googlecode.iterm2.pad.sshfs;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		8FC4E46A682B431756B25FB0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = iTerm2Pad/Resources/iTerm2Pad.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = H7V7XYVQ7D;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = iTerm2Pad/Resources/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.googlecode.iterm2.pad;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		A8FE60B8FCAE705CCF259189 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = iTerm2Pad/Resources/iTerm2Pad.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = H7V7XYVQ7D;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = iTerm2Pad/Resources/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.googlecode.iterm2.pad;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Debug;
+		};
+		C6DC8B6A4EEB7B195711B37A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = H7V7XYVQ7D;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.googlecode.iterm2.pad.tests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/iTerm2Pad.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/iTerm2Pad";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		CE574F801D84E97BD108FAE7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		48C7470175762F301DEEC0C0 /* Build configuration list for PBXNativeTarget "iTerm2Pad" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8FC4E46A682B431756B25FB0 /* Release */,
+				A8FE60B8FCAE705CCF259189 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		99FC89B97AFD1CF333419964 /* Build configuration list for PBXNativeTarget "iTerm2PadFileProvider" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6D64E10CF3DF3C104BB21013 /* Release */,
+				0A368F95CB8C35E7F57AD1FA /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C38F060D47DC27E30D44C21B /* Build configuration list for PBXNativeTarget "iTerm2PadTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C6DC8B6A4EEB7B195711B37A /* Release */,
+				2FC20EA71AC9A0C8090B6B8B /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DE2AE92D2E5B5D6F0409F924 /* Build configuration list for PBXProject "iTerm2Pad" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				33E3BD43E60B76D92D1B06DB /* Debug */,
+				CE574F801D84E97BD108FAE7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		26002919A46929518D48A0CA /* XCLocalSwiftPackageReference "TmuxControl" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = TmuxControl;
+		};
+		34301A963AFAEB72CFCCF8D6 /* XCLocalSwiftPackageReference "LocalShell" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = LocalShell;
+		};
+		BB1140892F3CF07401F9047E /* XCLocalSwiftPackageReference "SSHClient" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = SSHClient;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		11645FFB5816D75EC6B9973A /* XCRemoteSwiftPackageReference "SwiftTerm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/migueldeicaza/SwiftTerm.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.5.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		03040F8E53CA4A90841747E7 /* LocalShell */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 34301A963AFAEB72CFCCF8D6 /* XCLocalSwiftPackageReference "LocalShell" */;
+			productName = LocalShell;
+		};
+		06B2BD584D575F790D8AAE03 /* LocalShell */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 34301A963AFAEB72CFCCF8D6 /* XCLocalSwiftPackageReference "LocalShell" */;
+			productName = LocalShell;
+		};
+		0D0B82A826CC05037734D3D5 /* SSHClient */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BB1140892F3CF07401F9047E /* XCLocalSwiftPackageReference "SSHClient" */;
+			productName = SSHClient;
+		};
+		1185D75619D36A918DB91D12 /* SSHClient */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BB1140892F3CF07401F9047E /* XCLocalSwiftPackageReference "SSHClient" */;
+			productName = SSHClient;
+		};
+		1378702B8951F1C0D71D1F87 /* TmuxControl */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 26002919A46929518D48A0CA /* XCLocalSwiftPackageReference "TmuxControl" */;
+			productName = TmuxControl;
+		};
+		82A72D1462130ADFF499ACA7 /* TmuxControl */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 26002919A46929518D48A0CA /* XCLocalSwiftPackageReference "TmuxControl" */;
+			productName = TmuxControl;
+		};
+		894C7C0413EC39D3FE22F0A4 /* SwiftTerm */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 11645FFB5816D75EC6B9973A /* XCRemoteSwiftPackageReference "SwiftTerm" */;
+			productName = SwiftTerm;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 422C991F7E2DF1168BCE4E2F /* Project object */;
+}

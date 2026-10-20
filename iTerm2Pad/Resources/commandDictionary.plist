@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>awk</key>
+	<string>files</string>
+	<key>cat</key>
+	<string>files</string>
+	<key>cp</key>
+	<string>files</string>
+	<key>curl</key>
+	<string>curl_ios</string>
+	<key>grep</key>
+	<string>files</string>
+	<key>gzip</key>
+	<string>files</string>
+	<key>ls</key>
+	<string>files</string>
+	<key>mkdir</key>
+	<string>files</string>
+	<key>mv</key>
+	<string>files</string>
+	<key>ping</key>
+	<string>network_ios</string>
+	<key>rm</key>
+	<string>files</string>
+	<key>sed</key>
+	<string>files</string>
+	<key>tar</key>
+	<string>files</string>
+	<key>scp</key>
+	<string>iterm2pad</string>
+	<key>sftp</key>
+	<string>iterm2pad</string>
+	<key>git</key>
+	<string>iterm2pad</string>
+	<key>sshfs</key>
+	<string>iterm2pad</string>
+	<key>python3</key>
+	<string>python3</string>
+	<key>pip3</key>
+	<string>python3</string>
+	<key>ssh</key>
+	<string>iterm2pad</string>
+</dict>
+</plist>

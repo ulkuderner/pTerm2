@@ -1,0 +1,15 @@
+iTerm2 Pad is licensed under the GNU General Public License version 3.
+
+iTerm2 itself is licensed under GPL v2 or later. Because of Apache 2.0-licensed
+dependencies, which are only compatible with GPL v3, the license is effectively
+GPL v3. This iPad application is distributed under GPL-3.0-only.
+
+See the LICENSE file at the repository root for the full GPL text.
+
+Third-party components retain their own licenses:
+
+- ios_system and its command frameworks: BSD-3-Clause (Nicolas Holzschuch)
+- SwiftTerm: MIT (Miguel de Icaza)
+- libssh2: BSD-style (see the libssh2 COPYING file when downloaded)
+- libgit2: GPL-2 with linking exception
+- CPython: PSF License

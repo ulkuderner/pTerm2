@@ -1,0 +1,17 @@
+iTerm2 Pad Release Notes
+
+New Features:
+- iTerm2 Pad is a standalone iPad
+  terminal. It talks SSH on its own,
+  so the Mac does not need to be on.
+- Connect with tmux control mode
+  (tmux -CC). Windows become tabs
+  and panes become splits.
+- The local shell includes the Blink
+  / ios_system command set, plus
+  git, scp, sshfs, python3, and
+  pip3.
+- SSH identities are stored in the
+  Keychain. Hosts remember a remote
+  command, defaulting to
+  tmux -CC new -A -s main.
