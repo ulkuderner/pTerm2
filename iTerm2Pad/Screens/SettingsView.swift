@@ -11,17 +11,31 @@ struct SettingsView: View {
                 Section(String(localized: "Pad.Settings.Theme",
                                defaultValue: "Theme",
                                comment: "Settings section heading for the terminal color theme")) {
-                    Picker(String(localized: "Pad.Settings.Theme",
-                                  defaultValue: "Theme",
-                                  comment: "Settings section heading for the terminal color theme"),
-                           selection: $themeID) {
-                        ForEach(TerminalTheme.allCases) { theme in
-                            Text(theme.title).tag(theme.id)
+                    NavigationLink {
+                        ThemeGallery()
+                    } label: {
+                        LabeledContent(String(localized: "Pad.Settings.Theme",
+                                              defaultValue: "Theme",
+                                              comment: "Settings section heading for the terminal color theme")) {
+                            Text(TerminalTheme.allCases.first { $0.id == themeID }?.title ?? TerminalTheme.linux.title)
                         }
                     }
-                    .onChange(of: themeID) { _, newValue in
-                        TerminalTheme.current = TerminalTheme.allCases.first { $0.id == newValue } ?? .linux
+                }
+                Section(String(localized: "Pad.Settings.Agents",
+                               defaultValue: "Agents",
+                               comment: "Settings section heading for coding-agent CLIs")) {
+                    ForEach(AgentTool.all) { agent in
+                        LabeledContent(agent.title) {
+                            Text(agent.executable() == nil
+                                 ? String(localized: "Pad.Agent.Absent",
+                                          defaultValue: "Not installed",
+                                          comment: "Shown when an agent CLI is not on the shell path")
+                                 : agent.detail)
+                        }
                     }
+                    Text(String(localized: "Pad.Settings.AgentsHelp",
+                                defaultValue: "Open Claude, OpenAI, or Gemini from the Agents menu in Shell. Each one runs in its own pane.",
+                                comment: "Explains where the coding-agent commands are launched"))
                 }
                 Section(String(localized: "Pad.Settings.Backends",
                                defaultValue: "Backends",
@@ -67,6 +81,11 @@ struct SettingsView: View {
             .navigationTitle(String(localized: "Pad.Settings.Title",
                                     defaultValue: "Settings",
                                     comment: "Navigation title of the settings screen"))
+            .onReceive(NotificationCenter.default.publisher(for: .terminalThemeChanged)) { note in
+                if let id = note.object as? String {
+                    themeID = id
+                }
+            }
         }
     }
 }

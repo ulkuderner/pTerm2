@@ -63,11 +63,29 @@ enum TerminalFont {
     }
 }
 
-final class PadTerminalHost: UIView {
-    let terminal = TerminalView(frame: .zero)
+final class FocusTerminalView: TerminalView {
+    var onFocus: (() -> Void)?
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        onFocus?()
+        if !isFirstResponder {
+            _ = becomeFirstResponder()
+            reloadInputViews()
+        }
+        super.touchesBegan(touches, with: event)
+    }
+}
+
+final class PadTerminalHost: UIView, TerminalViewDelegate {
+    let terminal = FocusTerminalView(frame: .zero)
+    var pane: UUID?
+    var onBytes: ((Data) -> Void)?
+    var onResize: ((Int, Int) -> Void)?
     var onSplitVertical: (() -> Void)?
     var onSplitHorizontal: (() -> Void)?
+    var onClose: (() -> Void)?
     private var chromeObserver: NSObjectProtocol?
+    private var themeObserver: NSObjectProtocol?
     private var builtinAccessory: UIView?
 
     override init(frame: CGRect) {
@@ -76,6 +94,7 @@ final class PadTerminalHost: UIView {
         terminal.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         addSubview(terminal)
         backgroundColor = .black
+        terminal.terminalDelegate = self
         TerminalSplitShortcut.install()
         builtinAccessory = terminal.inputAccessoryView
         applyCurrentTheme()
@@ -87,7 +106,50 @@ final class PadTerminalHost: UIView {
         ) { [weak self] _ in
             self?.applyKeyboardBar()
         }
+        themeObserver = NotificationCenter.default.addObserver(
+            forName: .terminalThemeChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.applyCurrentTheme()
+        }
     }
+
+    /// Takes the hardware keyboard back after another pane has left the window.
+    func claimKeyboard() {
+        guard window != nil, !terminal.isFirstResponder else {
+            return
+        }
+        if terminal.becomeFirstResponder() {
+            terminal.reloadInputViews()
+        }
+    }
+
+    func send(source: TerminalView, data: ArraySlice<UInt8>) {
+        if data.count == 1, data.first == 0x04 {
+            onClose?()
+            return
+        }
+        onBytes?(Data(data))
+    }
+
+    func sizeChanged(source: TerminalView, newCols: Int, newRows: Int) {
+        guard newCols > 0, newRows > 0 else {
+            return
+        }
+        onResize?(newCols, newRows)
+    }
+
+    func setTerminalTitle(source: TerminalView, title: String) {}
+    func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
+    func scrolled(source: TerminalView, position: Double) {}
+    func requestOpenLink(source: TerminalView, link: String, params: [String: String]) {}
+    func clipboardCopy(source: TerminalView, content: Data) {
+        UIPasteboard.general.string = String(data: content, encoding: .utf8)
+    }
+    func rangeChanged(source: TerminalView, startY: Int, endY: Int) {}
+    func bell(source: TerminalView) {}
+    func iTermContent(source: TerminalView, content: ArraySlice<UInt8>) {}
 
     required init?(coder: NSCoder) {
         it_fatalError("PadTerminalHost is built in code")
@@ -106,17 +168,25 @@ final class PadTerminalHost: UIView {
         terminal.reloadInputViews()
     }
 
-    func handleSplit(_ presses: Set<UIPress>) -> Bool {
+    func handleKey(_ presses: Set<UIPress>) -> Bool {
         for press in presses {
-            guard let key = press.key, key.modifierFlags.contains(.command) else {
+            guard let key = press.key else {
                 continue
             }
-            if key.charactersIgnoringModifiers.lowercased() == "d" {
-                if key.modifierFlags.contains(.shift) {
+            let flags = key.modifierFlags
+            let plain = key.charactersIgnoringModifiers.lowercased()
+            let isD = key.keyCode == .keyboardD || plain == "d"
+            if flags.contains(.command), isD {
+                if flags.contains(.shift) {
                     onSplitHorizontal?()
                 } else {
                     onSplitVertical?()
                 }
+                return true
+            }
+            let isControlD = key.characters == "\u{4}" || (flags.contains(.control) && isD && !flags.contains(.command))
+            if isControlD, let onClose {
+                onClose()
                 return true
             }
         }
@@ -145,7 +215,7 @@ extension TerminalView {
     @objc func pad_pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
         var view: UIView? = self
         while let current = view {
-            if let host = current as? PadTerminalHost, host.handleSplit(presses) {
+            if let host = current as? PadTerminalHost, host.handleKey(presses) {
                 return
             }
             view = current.superview

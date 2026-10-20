@@ -65,6 +65,90 @@ struct TerminalTheme: Identifiable, Equatable, CaseIterable {
         ]
     )
 
+    static let dracula = TerminalTheme(
+        id: "dracula",
+        title: "Dracula",
+        foreground: ui(248, 248, 242),
+        background: ui(40, 42, 54),
+        cursor: ui(248, 248, 242),
+        palette: [
+            c(33, 34, 44), c(255, 85, 85), c(80, 250, 123), c(241, 250, 140),
+            c(189, 147, 249), c(255, 121, 198), c(139, 233, 253), c(248, 248, 242),
+            c(98, 114, 164), c(255, 110, 110), c(105, 255, 148), c(255, 255, 165),
+            c(214, 172, 255), c(255, 146, 223), c(164, 255, 255), c(255, 255, 255)
+        ]
+    )
+
+    static let nord = TerminalTheme(
+        id: "nord",
+        title: "Nord",
+        foreground: ui(216, 222, 233),
+        background: ui(46, 52, 64),
+        cursor: ui(216, 222, 233),
+        palette: [
+            c(59, 66, 82), c(191, 97, 106), c(163, 190, 140), c(235, 203, 139),
+            c(129, 161, 193), c(180, 142, 173), c(136, 192, 208), c(229, 233, 240),
+            c(76, 86, 106), c(191, 97, 106), c(163, 190, 140), c(235, 203, 139),
+            c(129, 161, 193), c(180, 142, 173), c(143, 188, 187), c(236, 239, 244)
+        ]
+    )
+
+    static let tokyo = TerminalTheme(
+        id: "tokyo",
+        title: "Tokyo Night",
+        foreground: ui(192, 202, 245),
+        background: ui(26, 27, 38),
+        cursor: ui(192, 202, 245),
+        palette: [
+            c(21, 22, 30), c(247, 118, 142), c(158, 206, 106), c(224, 175, 104),
+            c(122, 162, 247), c(187, 154, 247), c(125, 207, 255), c(169, 177, 214),
+            c(65, 72, 104), c(247, 118, 142), c(158, 206, 106), c(224, 175, 104),
+            c(122, 162, 247), c(187, 154, 247), c(125, 207, 255), c(192, 202, 245)
+        ]
+    )
+
+    static let catppuccin = TerminalTheme(
+        id: "catppuccin",
+        title: "Catppuccin",
+        foreground: ui(205, 214, 244),
+        background: ui(30, 30, 46),
+        cursor: ui(245, 224, 220),
+        palette: [
+            c(69, 71, 90), c(243, 139, 168), c(166, 227, 161), c(249, 226, 175),
+            c(137, 180, 250), c(245, 194, 231), c(148, 226, 213), c(186, 194, 222),
+            c(88, 91, 112), c(243, 139, 168), c(166, 227, 161), c(249, 226, 175),
+            c(137, 180, 250), c(245, 194, 231), c(148, 226, 213), c(166, 173, 200)
+        ]
+    )
+
+    static let one = TerminalTheme(
+        id: "one",
+        title: "One Dark",
+        foreground: ui(171, 178, 191),
+        background: ui(40, 44, 52),
+        cursor: ui(82, 139, 255),
+        palette: [
+            c(40, 44, 52), c(224, 108, 117), c(152, 195, 121), c(229, 192, 123),
+            c(97, 175, 239), c(198, 120, 221), c(86, 182, 194), c(171, 178, 191),
+            c(92, 99, 112), c(224, 108, 117), c(152, 195, 121), c(229, 192, 123),
+            c(97, 175, 239), c(198, 120, 221), c(86, 182, 194), c(255, 255, 255)
+        ]
+    )
+
+    static let ocean = TerminalTheme(
+        id: "ocean",
+        title: "Ocean",
+        foreground: ui(197, 228, 234),
+        background: ui(12, 28, 40),
+        cursor: ui(88, 196, 220),
+        palette: [
+            c(8, 20, 30), c(230, 92, 92), c(92, 196, 140), c(232, 196, 104),
+            c(88, 168, 230), c(176, 128, 214), c(72, 196, 204), c(197, 228, 234),
+            c(70, 96, 112), c(255, 128, 128), c(128, 230, 170), c(255, 220, 140),
+            c(128, 196, 255), c(210, 160, 240), c(120, 230, 236), c(255, 255, 255)
+        ]
+    )
+
     static let paper = TerminalTheme(
         id: "paper",
         title: "Paper",
@@ -79,7 +163,9 @@ struct TerminalTheme: Identifiable, Equatable, CaseIterable {
         ]
     )
 
-    static var allCases: [TerminalTheme] { [linux, vga, tango, solarized, paper] }
+    static var allCases: [TerminalTheme] {
+        [linux, dracula, nord, tokyo, catppuccin, one, ocean, solarized, tango, paper, vga]
+    }
 
     static var current: TerminalTheme {
         get {

@@ -18,3 +18,13 @@ New Features:
   Keychain. Hosts remember a remote
   command, defaulting to
   tmux -CC new -A -s main.
+- The shell has a theme gallery
+  (Dracula, Nord, Tokyo Night,
+  Catppuccin, and others). Command-D
+  splits the screen and the other
+  panes keep their contents at the
+  new size. Click a pane to select
+  it. Control-D closes that pane.
+- Agents in the shell toolbar open
+  Claude Code, OpenAI Codex, and
+  Gemini CLI, each in its own pane.

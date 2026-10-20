@@ -3,13 +3,37 @@ import Foundation
 
 /// Interactive login zsh on a pseudoterminal. The prompt and command line are
 /// drawn by zsh itself, so the screen is a terminal rather than a text field.
+/// `launchProgram` replaces zsh with an agent CLI on the same pty.
 final class ZshSession {
     var onOutput: ((Data) -> Void)?
+    var onExit: (() -> Void)?
+    /// Absolute path of a program to run instead of an interactive zsh.
+    var launchProgram: String?
+    var missingNotice: String?
     private var master: Int32 = -1
     private var child: pid_t = -1
     private var reader: DispatchSourceRead?
+    private var watch: DispatchSourceProcess?
+    private var started = false
+    private var exited = false
+
+    static var accountHome: String {
+        if let users = try? FileManager.default.contentsOfDirectory(atPath: "/Users") {
+            for name in users where name != "Shared" && !name.hasPrefix(".") {
+                let candidate = "/Users/\(name)/.oh-my-zsh/oh-my-zsh.sh"
+                if FileManager.default.isReadableFile(atPath: candidate) {
+                    return "/Users/\(name)"
+                }
+            }
+        }
+        return NSHomeDirectory()
+    }
 
     func start(columns: UInt16 = 80, rows: UInt16 = 24) {
+        guard !started else {
+            return
+        }
+        started = true
         var masterFD: Int32 = -1
         var slaveFD: Int32 = -1
         var size = winsize(ws_row: rows, ws_col: columns, ws_xpixel: 0, ws_ypixel: 0)
@@ -32,7 +56,19 @@ final class ZshSession {
         posix_spawnattr_setflags(&attr, Int16(POSIX_SPAWN_SETSID))
 
         let environment = Self.environment()
-        let arguments = ["/bin/zsh", "-i", "-l"]
+        let program: String
+        let arguments: [String]
+        if let launchProgram, FileManager.default.isExecutableFile(atPath: launchProgram) {
+            let script = "cd '\(Self.accountHome)' && exec '\(launchProgram)'"
+            program = "/bin/zsh"
+            arguments = ["/bin/zsh", "-i", "-l", "-c", script]
+        } else {
+            if let missingNotice {
+                emit(missingNotice + "\r\n")
+            }
+            program = "/bin/zsh"
+            arguments = ["/bin/zsh", "-i", "-l"]
+        }
         var argv: [UnsafeMutablePointer<CChar>?] = arguments.map { strdup($0) }
         argv.append(nil)
         var env: [UnsafeMutablePointer<CChar>?] = environment.map { strdup($0) }
@@ -47,7 +83,7 @@ final class ZshSession {
         var pid: pid_t = 0
         let result = argv.withUnsafeMutableBufferPointer { argvBuf in
             env.withUnsafeMutableBufferPointer { envBuf in
-                posix_spawn(&pid, "/bin/zsh", &actions, &attr, argvBuf.baseAddress, envBuf.baseAddress)
+                posix_spawn(&pid, program, &actions, &attr, argvBuf.baseAddress, envBuf.baseAddress)
             }
         }
         close(slaveFD)
@@ -58,14 +94,19 @@ final class ZshSession {
             return
         }
         child = pid
+        let process = DispatchSource.makeProcessSource(identifier: pid, eventMask: .exit, queue: .main)
+        process.setEventHandler { [weak self] in
+            self?.noteExit()
+        }
+        watch = process
+        process.resume()
         let source = DispatchSource.makeReadSource(fileDescriptor: masterFD, queue: .global(qos: .userInteractive))
         source.setEventHandler { [weak self] in
             self?.readAvailable()
         }
-        source.setCancelHandler { [weak self] in
-            if let fd = self?.master, fd >= 0 {
-                close(fd)
-                self?.master = -1
+        source.setCancelHandler {
+            if masterFD >= 0 {
+                close(masterFD)
             }
         }
         reader = source
@@ -93,8 +134,12 @@ final class ZshSession {
     }
 
     func stop() {
+        onExit = nil
+        master = -1
         reader?.cancel()
         reader = nil
+        watch?.cancel()
+        watch = nil
         if child > 0 {
             kill(child, SIGTERM)
             child = -1
@@ -107,6 +152,12 @@ final class ZshSession {
         }
         var buffer = [UInt8](repeating: 0, count: 4096)
         let count = read(master, &buffer, buffer.count)
+        if count == 0 {
+            DispatchQueue.main.async { [weak self] in
+                self?.noteExit()
+            }
+            return
+        }
         guard count > 0 else {
             return
         }
@@ -114,6 +165,14 @@ final class ZshSession {
         DispatchQueue.main.async { [weak self] in
             self?.onOutput?(data)
         }
+    }
+
+    private func noteExit() {
+        guard !exited else {
+            return
+        }
+        exited = true
+        onExit?()
     }
 
     private func emit(_ text: String) {
@@ -126,18 +185,10 @@ final class ZshSession {
     /// Prefer the Mac account that already has oh-my-zsh, so a login zsh
     /// sources the same ~/.zshrc the user uses in Terminal.
     private static func environment() -> [String] {
-        var home = NSHomeDirectory()
-        var zshRoot = ""
-        if let users = try? FileManager.default.contentsOfDirectory(atPath: "/Users") {
-            for name in users where name != "Shared" && !name.hasPrefix(".") {
-                let candidate = "/Users/\(name)/.oh-my-zsh/oh-my-zsh.sh"
-                if FileManager.default.isReadableFile(atPath: candidate) {
-                    home = "/Users/\(name)"
-                    zshRoot = "/Users/\(name)/.oh-my-zsh"
-                    break
-                }
-            }
-        }
+        let home = accountHome
+        let zshRoot = FileManager.default.isReadableFile(atPath: "\(home)/.oh-my-zsh/oh-my-zsh.sh")
+            ? "\(home)/.oh-my-zsh"
+            : ""
         let user = (home as NSString).lastPathComponent
         var values = [
             "HOME=\(home)",
@@ -148,7 +199,7 @@ final class ZshSession {
             "COLORTERM=truecolor",
             "LANG=en_US.UTF-8",
             "LC_ALL=en_US.UTF-8",
-            "PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+            "PATH=\(home)/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
         ]
         if !zshRoot.isEmpty {
             values.append("ZSH=\(zshRoot)")
