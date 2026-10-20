@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>iTerm2 Pad</string>
+	<string>pTerm2</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>iTerm2 Pad</string>
+	<string>pTerm2</string>
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
@@ -34,9 +34,9 @@
 	<key>UIRequiresFullScreen</key>
 	<false/>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>iTerm2 Pad can keep SSH sessions alive in the background when you turn on location tracking.</string>
+	<string>pTerm2 can keep SSH sessions alive in the background when you turn on location tracking.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>iTerm2 Pad uses the local network to open SSH sessions on machines you name.</string>
+	<string>pTerm2 uses the local network to open SSH sessions on machines you name.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>

@@ -28,7 +28,7 @@ struct KeyboardAccessory: View {
             }
             .padding(.horizontal, 8)
         }
-        .frame(height: 44)
+        .frame(minHeight: 44)
         .background(.bar)
     }
 
@@ -40,5 +40,6 @@ struct KeyboardAccessory: View {
                 .padding(.vertical, 6)
         }
         .buttonStyle(.bordered)
+        .frame(minHeight: 44)
     }
 }

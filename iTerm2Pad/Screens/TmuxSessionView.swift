@@ -43,7 +43,34 @@ struct TmuxSessionView: View {
                     }
                 }
             )
-            toolbar
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button(String(localized: "Pad.Tmux.NewWindow",
+                              defaultValue: "New Window",
+                              comment: "Creates a tmux window")) {
+                    session.tmux.gateway.newWindow()
+                }
+                Button(String(localized: "Pad.Tmux.SplitH",
+                              defaultValue: "Split →",
+                              comment: "Splits the current tmux pane horizontally")) {
+                    if let pane = selectedPane {
+                        session.tmux.gateway.splitWindow(horizontal: true, target: pane)
+                    }
+                }
+                Button(String(localized: "Pad.Tmux.SplitV",
+                              defaultValue: "Split ↓",
+                              comment: "Splits the current tmux pane vertically")) {
+                    if let pane = selectedPane {
+                        session.tmux.gateway.splitWindow(horizontal: false, target: pane)
+                    }
+                }
+                Button(String(localized: "Pad.Tmux.Detach",
+                              defaultValue: "Detach",
+                              comment: "Detaches from the tmux session")) {
+                    session.tmux.gateway.detach()
+                }
+            }
         }
         .onAppear {
             session.tmux.onWindowsChanged = {
@@ -90,35 +117,6 @@ struct TmuxSessionView: View {
         }
     }
 
-    private var toolbar: some View {
-        HStack {
-            Button(String(localized: "Pad.Tmux.NewWindow",
-                          defaultValue: "New Window",
-                          comment: "Creates a tmux window")) {
-                session.tmux.gateway.newWindow()
-            }
-            Button(String(localized: "Pad.Tmux.SplitH",
-                          defaultValue: "Split →",
-                          comment: "Splits the current tmux pane horizontally")) {
-                if let pane = selectedPane {
-                    session.tmux.gateway.splitWindow(horizontal: true, target: pane)
-                }
-            }
-            Button(String(localized: "Pad.Tmux.SplitV",
-                          defaultValue: "Split ↓",
-                          comment: "Splits the current tmux pane vertically")) {
-                if let pane = selectedPane {
-                    session.tmux.gateway.splitWindow(horizontal: false, target: pane)
-                }
-            }
-            Button(String(localized: "Pad.Tmux.Detach",
-                          defaultValue: "Detach",
-                          comment: "Detaches from the tmux session")) {
-                session.tmux.gateway.detach()
-            }
-        }
-        .padding(8)
-    }
 }
 
 struct TmuxSplitView: View {

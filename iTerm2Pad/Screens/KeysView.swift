@@ -62,7 +62,15 @@ struct KeysView: View {
                     .navigationTitle(String(localized: "Pad.Keys.ImportTitle",
                                             defaultValue: "Import Identity",
                                             comment: "Title of the PEM import sheet"))
+                    .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(String(localized: "Pad.Host.Cancel",
+                                          defaultValue: "Cancel",
+                                          comment: "Cancel host editor")) {
+                                showingImporter = false
+                            }
+                        }
                         ToolbarItem(placement: .confirmationAction) {
                             Button(String(localized: "Pad.Keys.Save",
                                           defaultValue: "Save",
@@ -76,6 +84,7 @@ struct KeysView: View {
                         }
                     }
                 }
+                .modifier(PadFormSheet())
             }
         }
     }

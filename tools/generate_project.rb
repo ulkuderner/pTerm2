@@ -16,6 +16,7 @@ PROJECT_PATH = File.join(IPAD_DIR, 'iTerm2Pad.xcodeproj')
 APP_DIR = File.join(IPAD_DIR, 'iTerm2Pad')
 PROVIDER_DIR = File.join(IPAD_DIR, 'iTerm2PadFileProvider')
 TESTS_DIR = File.join(IPAD_DIR, 'iTerm2PadTests')
+UI_TESTS_DIR = File.join(IPAD_DIR, 'iTerm2PadUITests')
 BUNDLE_ID = 'com.googlecode.iterm2.pad'
 TEAM = 'H7V7XYVQ7D'
 DEPLOYMENT_TARGET = '17.0'
@@ -176,13 +177,34 @@ tests_target.build_configurations.each do |config|
   settings['TARGETED_DEVICE_FAMILY'] = '2'
 end
 
+# ---------------------------------------------------------------------------
+# UI tests
+# ---------------------------------------------------------------------------
+ui_tests_target = project.new_target(:ui_test_bundle, 'iTerm2PadUITests', :ios, DEPLOYMENT_TARGET)
+add_swift_tree(project, ui_tests_target, UI_TESTS_DIR, 'iTerm2PadUITests')
+ui_tests_target.add_dependency(target)
+
+ui_tests_target.build_configurations.each do |config|
+  settings = config.build_settings
+  settings['PRODUCT_BUNDLE_IDENTIFIER'] = "#{BUNDLE_ID}.uitests"
+  settings['GENERATE_INFOPLIST_FILE'] = 'YES'
+  settings['IPHONEOS_DEPLOYMENT_TARGET'] = DEPLOYMENT_TARGET
+  settings['SDKROOT'] = 'iphoneos'
+  settings['SWIFT_VERSION'] = '5.0'
+  settings['CODE_SIGN_STYLE'] = 'Automatic'
+  settings['DEVELOPMENT_TEAM'] = TEAM
+  settings['TARGETED_DEVICE_FAMILY'] = '2'
+  settings['TEST_TARGET_NAME'] = 'iTerm2Pad'
+end
+
 project.save
 
 scheme = Xcodeproj::XCScheme.new
 scheme.add_build_target(target)
 scheme.set_launch_target(target)
 scheme.add_test_target(tests_target)
+scheme.add_test_target(ui_tests_target)
 scheme.save_as(PROJECT_PATH, 'iTerm2Pad', true)
 
 puts "Wrote #{PROJECT_PATH}"
-puts "Targets: iTerm2Pad, iTerm2PadFileProvider, iTerm2PadTests"
+puts "Targets: iTerm2Pad, iTerm2PadFileProvider, iTerm2PadTests, iTerm2PadUITests"

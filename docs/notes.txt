@@ -1,7 +1,7 @@
-iTerm2 Pad Release Notes
+pTerm2 Release Notes
 
 New Features:
-- iTerm2 Pad is a standalone iPad
+- pTerm2 is a standalone iPad
   terminal. It talks SSH on its own,
   so the Mac does not need to be on.
 - Connect with tmux control mode

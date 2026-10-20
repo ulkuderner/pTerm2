@@ -43,7 +43,7 @@ struct SettingsView: View {
                                defaultValue: "About",
                                comment: "Settings section heading for license")) {
                     Text(String(localized: "Pad.Settings.License",
-                                defaultValue: "iTerm2 Pad is GPL-3. Local commands come from ios_system (BSD). The terminal grid is SwiftTerm (MIT).",
+                                defaultValue: "pTerm2 is GPL-3. Local commands come from ios_system (BSD). The terminal grid is SwiftTerm (MIT).",
                                 comment: "Short license summary on the settings screen"))
                 }
             }

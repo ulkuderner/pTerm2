@@ -5,27 +5,12 @@ struct HomeView: View {
 
     var body: some View {
         @Bindable var model = model
-        TabView(selection: $model.tab) {
-            HostListView()
-                .tabItem {
-                    Text(AppModel.Tab.hosts.title)
-                }
-                .tag(AppModel.Tab.hosts)
-            LocalShellView()
-                .tabItem {
-                    Text(AppModel.Tab.shell.title)
-                }
-                .tag(AppModel.Tab.shell)
-            KeysView()
-                .tabItem {
-                    Text(AppModel.Tab.keys.title)
-                }
-                .tag(AppModel.Tab.keys)
-            SettingsView()
-                .tabItem {
-                    Text(AppModel.Tab.settings.title)
-                }
-                .tag(AppModel.Tab.settings)
+        Group {
+            if #available(iOS 18.0, *) {
+                PadSidebar(model: model)
+            } else {
+                PadTabs(model: model)
+            }
         }
         .fullScreenCover(item: sessionBinding) { session in
             SessionContainerView(session: session)
@@ -62,6 +47,63 @@ struct HomeView: View {
                 model.activeSession = newValue
             }
         )
+    }
+}
+
+@available(iOS 18.0, *)
+private struct PadSidebar: View {
+    @Bindable var model: AppModel
+
+    var body: some View {
+        TabView(selection: $model.tab) {
+            Tab(AppModel.Tab.hosts.title, systemImage: "server.rack", value: AppModel.Tab.hosts) {
+                HostListView()
+            }
+            Tab(AppModel.Tab.shell.title, systemImage: "terminal", value: AppModel.Tab.shell) {
+                LocalShellView()
+            }
+            Tab(AppModel.Tab.keys.title, systemImage: "key.fill", value: AppModel.Tab.keys) {
+                KeysView()
+            }
+            Tab(AppModel.Tab.settings.title, systemImage: "gearshape.fill", value: AppModel.Tab.settings) {
+                SettingsView()
+            }
+        }
+        .tabViewStyle(.sidebarAdaptable)
+    }
+}
+
+private struct PadTabs: View {
+    @Bindable var model: AppModel
+
+    var body: some View {
+        TabView(selection: $model.tab) {
+            HostListView()
+                .tabItem { Text(AppModel.Tab.hosts.title) }
+                .tag(AppModel.Tab.hosts)
+            LocalShellView()
+                .tabItem { Text(AppModel.Tab.shell.title) }
+                .tag(AppModel.Tab.shell)
+            KeysView()
+                .tabItem { Text(AppModel.Tab.keys.title) }
+                .tag(AppModel.Tab.keys)
+            SettingsView()
+                .tabItem { Text(AppModel.Tab.settings.title) }
+                .tag(AppModel.Tab.settings)
+        }
+    }
+}
+
+struct PadFormSheet: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content
+                .presentationSizing(.form)
+                .presentationDragIndicator(.visible)
+        } else {
+            content
+                .presentationDragIndicator(.visible)
+        }
     }
 }
 
