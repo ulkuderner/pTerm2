@@ -14,6 +14,11 @@ enum ShellRoot {
 
     static var mobile: URL { root }
 
+    /// Container root rejects new files on iPadOS. Startup files live here.
+    static var profile: URL {
+        root.appendingPathComponent("Library/pterm", isDirectory: true)
+    }
+
     static func commandDirectory(id: String) -> URL {
         root.appendingPathComponent("Library/Caches/pterm-cmd/\(id)", isDirectory: true)
     }
@@ -33,6 +38,10 @@ enum PtermMain {
             let jailed = root.withCString { pterm_try_chroot($0) }
             let home = jailed == 0 ? mobile : "/home/mobile"
             home.withCString { pterm_set_shell_home($0) }
+            let startup = Self.argument(after: "--pterm-zshrc") ?? home + "/.zshrc"
+            let rc = jailed == 0 ? startup : "/.zshrc"
+            rc.withCString { pterm_set_zshrc($0) }
+            setenv("ZDOTDIR", URL(fileURLWithPath: rc).deletingLastPathComponent().path, 1)
             if let command = Self.argument(after: "--pterm-cmd") {
                 let directory = jailed == 0 ? command : "/Library/Caches/pterm-cmd/" + URL(fileURLWithPath: command).lastPathComponent
                 setenv("PTERM_CMD_DIR", directory, 1)
@@ -94,6 +103,9 @@ func pterm_enter_zsh() -> Int32
 
 @_silgen_name("pterm_set_shell_home")
 func pterm_set_shell_home(_ home: UnsafePointer<CChar>)
+
+@_silgen_name("pterm_set_zshrc")
+func pterm_set_zshrc(_ path: UnsafePointer<CChar>)
 
 @_silgen_name("pterm_try_chroot")
 func pterm_try_chroot(_ root: UnsafePointer<CChar>) -> Int32

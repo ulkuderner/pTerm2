@@ -52,6 +52,14 @@ void pterm_set_shell_home(const char *home) {
     setenv("PTERM_CMD_DIR", command_dir, 1);
 }
 
+void pterm_set_zshrc(const char *path) {
+    if (!path || !*path) {
+        return;
+    }
+    snprintf(pterm_home_rc, sizeof(pterm_home_rc), "%s", path);
+    setenv("PTERM_ZSHRC", pterm_home_rc, 1);
+}
+
 static void *pterm_thread(void *raw) {
     struct pterm_job *job = raw;
     char name[] = "zsh";

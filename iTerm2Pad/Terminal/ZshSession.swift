@@ -42,6 +42,7 @@ final class ZshSession {
     private var launchFD: Int32 = -1
     /// Held open for the life of the pane. zsh waits on one byte here instead of forking sleep.
     private var replyFD: Int32 = -1
+    private var startupFault: String?
 
     static var accountHome: String {
         if let users = try? FileManager.default.contentsOfDirectory(atPath: "/Users") {
@@ -170,9 +171,16 @@ final class ZshSession {
         openReplyPipe(in: commandDir)
         setenv("PTERM_LAUNCH_DIR", launchDir.path, 1)
         setenv("PTERM_CMD_DIR", commandDir.path, 1)
+        let startup = ShellRoot.profile.appendingPathComponent(".zshrc")
         home.path.withCString { pterm_set_shell_home($0) }
+        startup.path.withCString { pterm_set_zshrc($0) }
+        setenv("ZDOTDIR", ShellRoot.profile.path, 1)
+        setenv("PTERM_ZSHRC", startup.path, 1)
         setenv("PTERM_CMD_DIR", commandDir.path, 1)
         setenv("PTERM_ROOT", ShellRoot.root.path, 1)
+        if let startupFault {
+            emit(startupFault)
+        }
         watchLaunches(at: launchDir)
         watchCommands(at: commandDir)
         if CommandLine.arguments.contains("-pterm-uitest") {
@@ -226,8 +234,8 @@ final class ZshSession {
         }
         var environment = [
             "HOME": home.path,
-            "ZDOTDIR": home.path,
-            "PTERM_ZSHRC": home.appendingPathComponent(".zshrc").path,
+            "ZDOTDIR": ShellRoot.profile.path,
+            "PTERM_ZSHRC": ShellRoot.profile.appendingPathComponent(".zshrc").path,
             "PTERM_ROOT": ShellRoot.root.path,
             "USER": "mobile",
             "LOGNAME": "mobile",
@@ -258,7 +266,7 @@ final class ZshSession {
             environment.removeValue(forKey: "PTERM_ZSHRC")
             environment.removeValue(forKey: "PTERM_CMD_DIR")
         }
-        let arguments = [executable.path, "--pterm-zsh", "--pterm-home", home.path, "--pterm-root", ShellRoot.root.path, "--pterm-cmd", commandDir.path]
+        let arguments = [executable.path, "--pterm-zsh", "--pterm-home", home.path, "--pterm-root", ShellRoot.root.path, "--pterm-cmd", commandDir.path, "--pterm-zshrc", ShellRoot.profile.appendingPathComponent(".zshrc").path]
         var argv: [UnsafeMutablePointer<CChar>?] = arguments.map { strdup($0) }
         argv.append(nil)
         var env: [UnsafeMutablePointer<CChar>?] = []
@@ -312,7 +320,13 @@ final class ZshSession {
         try? fileManager.createDirectory(at: root.appendingPathComponent("tmp"), withIntermediateDirectories: true)
         try? fileManager.createDirectory(at: root.appendingPathComponent("bin"), withIntermediateDirectories: true)
         try? fileManager.createDirectory(at: home, withIntermediateDirectories: true)
-        let omz = home.appendingPathComponent(".oh-my-zsh", isDirectory: true)
+        let profile = ShellRoot.profile
+        do {
+            try fileManager.createDirectory(at: profile, withIntermediateDirectories: true)
+        } catch {
+            startupFault = "pterm: shell directory \(profile.path) (\(error.localizedDescription))\r\n"
+        }
+        let omz = profile.appendingPathComponent(".oh-my-zsh", isDirectory: true)
         let marker = omz.appendingPathComponent("pterm2-omz-version")
         let bundled = Bundle.main.bundleURL.appendingPathComponent("Shell/omz", isDirectory: true)
         let wanted = (try? String(contentsOf: bundled.appendingPathComponent("pterm2-omz-version"), encoding: .utf8)) ?? "3"
@@ -326,14 +340,15 @@ final class ZshSession {
                                          withIntermediateDirectories: true)
         try? fileManager.createDirectory(at: omz.appendingPathComponent("cache", isDirectory: true),
                                          withIntermediateDirectories: true)
-        let prefix = home.appendingPathComponent("opt/homebrew", isDirectory: true)
+        try? fileManager.createDirectory(at: home.appendingPathComponent("opt"), withIntermediateDirectories: true)
+        let prefix = profile.appendingPathComponent("opt/homebrew", isDirectory: true)
         try? fileManager.createDirectory(at: prefix.appendingPathComponent("bin"), withIntermediateDirectories: true)
         try? fileManager.createDirectory(at: prefix.appendingPathComponent("Cellar"), withIntermediateDirectories: true)
-        let zshrc = home.appendingPathComponent(".zshrc")
-        let stamp = home.appendingPathComponent(".pterm2-zshrc")
-        if (try? String(contentsOf: stamp, encoding: .utf8)) != "37" {
+        let zshrc = profile.appendingPathComponent(".zshrc")
+        let stamp = profile.appendingPathComponent(".pterm2-zshrc")
+        if (try? String(contentsOf: stamp, encoding: .utf8)) != "38" {
             let bundledP10k = Bundle.main.bundleURL.appendingPathComponent("Shell/omz/p10k.zsh")
-            let installedP10k = home.appendingPathComponent(".p10k.zsh")
+            let installedP10k = profile.appendingPathComponent(".p10k.zsh")
             if fileManager.fileExists(atPath: bundledP10k.path) {
                 try? fileManager.removeItem(at: installedP10k)
                 try? fileManager.copyItem(at: bundledP10k, to: installedP10k)
@@ -341,10 +356,7 @@ final class ZshSession {
             let text = """
             unsetopt xtrace verbose
             setopt typeset_silent
-            if [[ -n $ZDOTDIR ]]; then
-              export HOME="$ZDOTDIR"
-            fi
-            export ZSH="$HOME/.oh-my-zsh"
+            export ZSH="${ZDOTDIR:-$HOME}/.oh-my-zsh"
             export ZSH_THEME="powerlevel10k/powerlevel10k"
             export DISABLE_AUTO_UPDATE=true
             export DISABLE_UPDATE_PROMPT=true
@@ -354,20 +366,20 @@ final class ZshSession {
             setopt extended_glob
             fpath=($ZSH/completions/Base/*(/N) $ZSH/completions/Zsh/*(/N) $ZSH/completions/Unix/Type(/N) $ZSH/completions $ZSH/functions $ZSH/zsh-functions $fpath)
             autoload -Uz compinit
-            compinit -u -d "$HOME/.zcompdump"
+            compinit -u -d "${ZDOTDIR:-$HOME}/.zcompdump"
             plugins=(git bgnotify sudo history dotenv)
             source "$ZSH/oh-my-zsh.sh"
             unsetopt xtrace
             bindkey '^I' expand-or-complete
             zstyle ':completion:*' menu select
-            [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+            [[ ! -f ${ZDOTDIR:-$HOME}/.p10k.zsh ]] || source ${ZDOTDIR:-$HOME}/.p10k.zsh
             cd "$HOME"
             if [[ -n $PTERM_ROOT ]]; then
               cd() {
                 builtin cd "$@" || return
                 case $PWD in
                   $PTERM_ROOT|$PTERM_ROOT/*) ;;
-                  *) builtin cd -- "$PTERM_ROOT/home/mobile" ;;
+                  *) builtin cd -- "$PTERM_ROOT" ;;
                 esac
               }
             fi
@@ -427,13 +439,10 @@ final class ZshSession {
             fi
             """
             do {
-                try text.write(to: zshrc, atomically: true, encoding: .utf8)
-                guard fileManager.isReadableFile(atPath: zshrc.path) else {
-                    throw CocoaError(.fileWriteUnknown)
-                }
-                try Data("37".utf8).write(to: stamp)
+                try text.write(to: zshrc, atomically: false, encoding: .utf8)
+                try Data("38".utf8).write(to: stamp)
             } catch {
-                fputs("pterm: could not write shell startup\n", stderr)
+                startupFault = "pterm: shell startup \(zshrc.path) (\(error.localizedDescription))\r\n"
             }
         }
         return home

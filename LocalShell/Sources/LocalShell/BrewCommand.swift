@@ -12,7 +12,7 @@ struct BrewCommand: ShellCommand {
     ]
 
     func run(arguments: [String], context: inout CommandContext) throws -> Int32 {
-        let prefix = context.home.appendingPathComponent("opt/homebrew")
+        let prefix = context.home.appendingPathComponent("Library/pterm/opt/homebrew")
         try FileManager.default.createDirectory(at: prefix.appendingPathComponent("bin"),
                                                 withIntermediateDirectories: true)
         let verb = arguments.first ?? "help"
