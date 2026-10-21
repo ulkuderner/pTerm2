@@ -200,11 +200,22 @@ final class ZshSession {
         var noSignal: Int32 = 1
         setsockopt(pair[0], SOL_SOCKET, SO_NOSIGPIPE, &noSignal, socklen_t(MemoryLayout<Int32>.size))
         let forceInProcess = CommandLine.arguments.contains("-pterm-inprocess")
-        if !forceInProcess,
+        let forceBuiltin = CommandLine.arguments.contains("-pterm-spawn-fail")
+        if !forceInProcess && !forceBuiltin,
            let executable = Bundle.main.executableURL,
            spawnZsh(executable: executable, socket: pair[1], parent: pair[0], home: home, commandDir: commandDir, columns: columns, rows: rows) {
             close(pair[1])
             attach(pair[0])
+            return
+        }
+        if !forceInProcess {
+            close(pair[0])
+            close(pair[1])
+            let reason = forceBuiltin ? 1 : spawnStatus
+            missingNotice = String(localized: "Pad.Shell.Builtin",
+                                   defaultValue: "zsh could not start in the iPad sandbox (\(reason)). This pane uses the built-in shell.",
+                                   comment: "Shown when the first pane cannot start zsh and falls back to the built-in shell.")
+            startBuiltin()
             return
         }
         let result = pterm_start_zsh(pair[1], Int32(columns), Int32(rows))
@@ -603,6 +614,12 @@ final class ZshSession {
             writeTerminal("\(launchProgram) is not available in the iPad sandbox.\r\n")
         }
         writeTerminal(shell.prompt())
+        if CommandLine.arguments.contains("-pterm-selftest") {
+            for command in ["ls", "brew --prefix", "git status"] {
+                writeTerminal("\(command)\r\n")
+                _ = shell.run(command)
+            }
+        }
     }
 
     private func acceptBuiltin(_ data: Data) {
