@@ -40,6 +40,8 @@ final class ZshSession {
     private var launchSource: DispatchSourceFileSystemObject?
     private var commandTimer: DispatchSourceTimer?
     private var launchFD: Int32 = -1
+    /// Held open for the life of the pane. zsh waits on one byte here instead of forking sleep.
+    private var replyFD: Int32 = -1
 
     static var accountHome: String {
         if let users = try? FileManager.default.contentsOfDirectory(atPath: "/Users") {
@@ -165,6 +167,7 @@ final class ZshSession {
         let launchDir = home.appendingPathComponent("Library/Caches/pterm-launch", isDirectory: true)
         try? FileManager.default.createDirectory(at: launchDir, withIntermediateDirectories: true)
         try? FileManager.default.createDirectory(at: commandDir, withIntermediateDirectories: true)
+        openReplyPipe(in: commandDir)
         setenv("PTERM_LAUNCH_DIR", launchDir.path, 1)
         setenv("PTERM_CMD_DIR", commandDir.path, 1)
         home.path.withCString { pterm_set_shell_home($0) }
@@ -175,6 +178,9 @@ final class ZshSession {
         if CommandLine.arguments.contains("-pterm-uitest") {
             setenv("PTERM_UTEST", "1", 1)
             try? Data("1".utf8).write(to: home.appendingPathComponent(".pterm-utest"))
+        }
+        if CommandLine.arguments.contains("-pterm-selftest") {
+            setenv("PTERM_SELFTEST", "1", 1)
         }
 
         var pair = [Int32](repeating: 0, count: 2)
@@ -236,6 +242,9 @@ final class ZshSession {
         ]
         if CommandLine.arguments.contains("-pterm-uitest") {
             environment["PTERM_UTEST"] = "1"
+        }
+        if CommandLine.arguments.contains("-pterm-selftest") {
+            environment["PTERM_SELFTEST"] = "1"
         }
         let inherited = ProcessInfo.processInfo.environment
         if inherited["SIMULATOR_ROOT"] != nil || inherited["SIMULATOR_UDID"] != nil {
@@ -322,7 +331,7 @@ final class ZshSession {
         try? fileManager.createDirectory(at: prefix.appendingPathComponent("Cellar"), withIntermediateDirectories: true)
         let zshrc = home.appendingPathComponent(".zshrc")
         let stamp = home.appendingPathComponent(".pterm2-zshrc")
-        if (try? String(contentsOf: stamp, encoding: .utf8)) != "30" {
+        if (try? String(contentsOf: stamp, encoding: .utf8)) != "37" {
             let bundledP10k = Bundle.main.bundleURL.appendingPathComponent("Shell/omz/p10k.zsh")
             let installedP10k = home.appendingPathComponent(".p10k.zsh")
             if fileManager.fileExists(atPath: bundledP10k.path) {
@@ -343,7 +352,7 @@ final class ZshSession {
             export ZSH_DISABLE_COMPFIX=true
             export GITSTATUS_AUTO_INSTALL=0
             setopt extended_glob
-            fpath=($ZSH/completions/Base/*(/N) $ZSH/completions/Zsh/*(/N) $ZSH/completions/Unix/Type(/N) $ZSH/completions $ZSH/functions $fpath)
+            fpath=($ZSH/completions/Base/*(/N) $ZSH/completions/Zsh/*(/N) $ZSH/completions/Unix/Type(/N) $ZSH/completions $ZSH/functions $ZSH/zsh-functions $fpath)
             autoload -Uz compinit
             compinit -u -d "$HOME/.zcompdump"
             plugins=(git bgnotify sudo history dotenv)
@@ -367,27 +376,40 @@ final class ZshSession {
             fi
             pterm_arm() {
               emulate -L zsh
+              zmodload zsh/system 2>/dev/null || return 127
               local dir=$PTERM_CMD_DIR
               if [[ -z $dir ]]; then
                 print -ru2 -- "pterm: command directory missing"
                 return 127
               fi
-              local id="c${RANDOM}$SECONDS"
-              print -r -- "$PWD" > "$dir/$id.pwd"
-              print -l -- "$@" > "$dir/$id.ready"
-              local spins=0
-              while [[ ! -f $dir/$id.out && spins -lt 400 ]]; do
-                read -t 0.05 || true
-                (( spins++ ))
+              local id="c${RANDOM}$SECONDS" fd arg text code chunk
+              sysopen -w -o creat,trunc -u fd -- "$dir/$id.pwd" || return 127
+              syswrite -o $fd -- "$PWD"$'\n'
+              exec {fd}>&-
+              sysopen -w -o creat,trunc -u fd -- "$dir/$id.args" || return 127
+              for arg in "$@"; do
+                syswrite -o $fd -- "$arg"$'\n'
               done
+              exec {fd}>&-
+              sysopen -w -o creat,trunc -u fd -- "$dir/$id.ready" || return 127
+              exec {fd}>&-
+              sysopen -r -u fd -- "$dir/reply" || return 127
+              sysread -i $fd -s 1 -t 4 chunk
+              exec {fd}>&-
               if [[ ! -f $dir/$id.out ]]; then
                 print -ru2 -- "pterm: $1 timed out"
                 return 127
               fi
-              local text="$(<"$dir/$id.out")"
+              sysopen -r -u fd -- "$dir/$id.out" || return 127
+              sysread -i $fd text
+              exec {fd}>&-
               [[ -z $text ]] || print -r -- "$text"
-              local code=1
-              [[ -f $dir/$id.code ]] && code=$(<"$dir/$id.code")
+              code=1
+              if [[ -f $dir/$id.code ]]; then
+                sysopen -r -u fd -- "$dir/$id.code" || return 1
+                sysread -i $fd code
+                exec {fd}>&-
+              fi
               return $code
             }
             for pterm_cmd in ls cat mkdir touch rm cp mv grep egrep fgrep head wc ssh mosh scp git sshfs umount python3 python pip3 pip brew; do
@@ -409,7 +431,7 @@ final class ZshSession {
                 guard fileManager.isReadableFile(atPath: zshrc.path) else {
                     throw CocoaError(.fileWriteUnknown)
                 }
-                try Data("30".utf8).write(to: stamp)
+                try Data("37".utf8).write(to: stamp)
             } catch {
                 fputs("pterm: could not write shell startup\n", stderr)
             }
@@ -437,6 +459,22 @@ final class ZshSession {
         source.resume()
     }
 
+    private func openReplyPipe(in directory: URL) {
+        let reply = directory.appendingPathComponent("reply")
+        if mkfifo(reply.path, 0o600) != 0 && errno != EEXIST {
+            return
+        }
+        replyFD = open(reply.path, O_RDWR)
+    }
+
+    private func signalReply() {
+        guard replyFD >= 0 else {
+            return
+        }
+        var byte: UInt8 = 1
+        _ = Darwin.write(replyFD, &byte, 1)
+    }
+
     private func watchCommands(at directory: URL) {
         let timer = DispatchSource.makeTimerSource(queue: .main)
         timer.schedule(deadline: .now(), repeating: .milliseconds(40))
@@ -453,7 +491,8 @@ final class ZshSession {
             let id = ready.deletingPathExtension().lastPathComponent
             let pwdURL = directory.appendingPathComponent("\(id).pwd")
             let pwd = (try? String(contentsOf: pwdURL, encoding: .utf8)) ?? ""
-            let raw = (try? String(contentsOf: ready, encoding: .utf8)) ?? ""
+            let argsURL = directory.appendingPathComponent("\(id).args")
+            let raw = (try? String(contentsOf: argsURL, encoding: .utf8)) ?? ""
             var argv = raw.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
             if argv.last?.isEmpty == true {
                 argv.removeLast()
@@ -468,8 +507,9 @@ final class ZshSession {
             }
             let codeURL = directory.appendingPathComponent("\(id).code")
             let outURL = directory.appendingPathComponent("\(id).out")
-            try? Data("\(code)\n".utf8).write(to: codeURL)
-            try? Data(text.utf8).write(to: outURL)
+            try? Data("\(code)\n".utf8).write(to: codeURL, options: .atomic)
+            try? Data(text.utf8).write(to: outURL, options: .atomic)
+            signalReply()
             try? FileManager.default.removeItem(at: ready)
             try? FileManager.default.removeItem(at: pwdURL)
         }

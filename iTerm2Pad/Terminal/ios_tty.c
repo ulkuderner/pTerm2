@@ -11,9 +11,17 @@
 /* Active only on a zsh thread. The interface thread keeps the system calls. */
 static _Thread_local int pterm_tty_active = 0;
 static _Thread_local int pterm_in_process = 0;
+static _Thread_local pid_t pterm_owner_pid = 0;
 
 void pterm_mark_inprocess(void) {
     pterm_in_process = 1;
+    pterm_owner_pid = getpid();
+}
+
+/* Forked command substitutions share this thread-local flag but not this pid.
+ * zsh uses that to keep waiting with signals in a real child process. */
+int pterm_in_process_flag(void) {
+    return pterm_in_process && getpid() == pterm_owner_pid;
 }
 
 extern void pterm_release_zsh(void);
@@ -22,7 +30,7 @@ int pterm_tty_fd(void);
 /* In-process zsh shares the app process. Its exit must end the thread,
  * not the whole iPad app, so the pane can open a new shell. */
 void _exit(int status) {
-    if (pterm_in_process) {
+    if (pterm_in_process && getpid() == pterm_owner_pid) {
         int fd = pterm_tty_fd();
         pterm_in_process = 0;
         pterm_release_zsh();

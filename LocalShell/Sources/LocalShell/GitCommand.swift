@@ -8,7 +8,7 @@ struct GitCommand: ShellCommand {
 
     func run(arguments: [String], context: inout CommandContext) throws -> Int32 {
         guard let verb = arguments.first else {
-            context.stdout("usage: git <clone|init|status|add|commit|fetch|pull|push|log|diff|branch|checkout|switch>\n")
+            context.stdout("usage: git <clone|init|status|add|commit|fetch|pull|push|log|diff|branch|checkout|switch|rev-parse>\n")
             return 1
         }
         let rest = Array(arguments.dropFirst())
@@ -31,6 +31,8 @@ struct GitCommand: ShellCommand {
             return try gitCheckout(rest, context: &context)
         case "clone", "fetch", "pull", "push":
             return try gitRemote(verb, rest, context: &context)
+        case "rev-parse":
+            return gitRevParse(rest, context: &context)
         default:
             throw ShellError.usage("git: unknown subcommand \(verb)")
         }
@@ -38,6 +40,49 @@ struct GitCommand: ShellCommand {
 
     private func gitDir(in context: CommandContext) -> URL {
         context.workingDirectory.appendingPathComponent(".git")
+    }
+
+    /// Answers the queries powerlevel10k uses to decide whether a directory is a repository.
+    /// A directory outside a work tree stays silent, the same way git hides this from a prompt.
+    private func gitRevParse(_ arguments: [String], context: inout CommandContext) -> Int32 {
+        guard let git = findGitDir(from: context.workingDirectory, root: context.root) else {
+            return 128
+        }
+        let toplevel = git.deletingLastPathComponent()
+        if arguments.contains("--git-dir") {
+            context.stdout(git.path + "\n")
+        }
+        if arguments.contains("--show-toplevel") {
+            context.stdout(toplevel.path + "\n")
+        }
+        if arguments.contains("--is-inside-work-tree") {
+            context.stdout("true\n")
+        }
+        if arguments.contains("--abbrev-ref"), let head = try? String(contentsOf: git.appendingPathComponent("HEAD"), encoding: .utf8) {
+            let ref = head.trimmingCharacters(in: .whitespacesAndNewlines)
+            context.stdout((ref.hasPrefix("ref: refs/heads/") ? String(ref.dropFirst(16)) : "HEAD") + "\n")
+        }
+        return 0
+    }
+
+    private func findGitDir(from start: URL, root: URL) -> URL? {
+        var current = start.standardizedFileURL
+        let limit = root.standardizedFileURL.path
+        while true {
+            let git = current.appendingPathComponent(".git")
+            var isDirectory: ObjCBool = false
+            if FileManager.default.fileExists(atPath: git.path, isDirectory: &isDirectory), isDirectory.boolValue {
+                return git
+            }
+            if current.path == limit {
+                return nil
+            }
+            let parent = current.deletingLastPathComponent()
+            if parent.path == current.path {
+                return nil
+            }
+            current = parent
+        }
     }
 
     private func gitInit(_ arguments: [String], context: inout CommandContext) throws -> Int32 {
