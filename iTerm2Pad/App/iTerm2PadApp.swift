@@ -1,6 +1,5 @@
 import SwiftUI
 
-@main
 struct iTerm2PadApp: App {
     @State private var model = AppModel()
 

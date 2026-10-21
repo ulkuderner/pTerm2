@@ -14,7 +14,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "81E936EA17F3B3E0F3622F9D"
+               BlueprintIdentifier = "6222D457076D339A6332DF3A"
                BuildableName = "iTerm2Pad.app"
                BlueprintName = "iTerm2Pad"
                ReferencedContainer = "container:iTerm2Pad.xcodeproj">
@@ -30,7 +30,7 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "81E936EA17F3B3E0F3622F9D"
+            BlueprintIdentifier = "6222D457076D339A6332DF3A"
             BuildableName = "iTerm2Pad.app"
             BlueprintName = "iTerm2Pad"
             ReferencedContainer = "container:iTerm2Pad.xcodeproj">
@@ -41,7 +41,7 @@
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "C4A5ACD7176D86D6400D5938"
+               BlueprintIdentifier = "98AFCFD234EBC039E65E5A85"
                BuildableName = "iTerm2PadTests.xctest"
                BlueprintName = "iTerm2PadTests"
                ReferencedContainer = "container:iTerm2Pad.xcodeproj">
@@ -51,7 +51,7 @@
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "FE79C55F2140AE8312DA18E2"
+               BlueprintIdentifier = "E313526FE64135FE69E5E42C"
                BuildableName = "iTerm2PadUITests.xctest"
                BlueprintName = "iTerm2PadUITests"
                ReferencedContainer = "container:iTerm2Pad.xcodeproj">
@@ -73,7 +73,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "81E936EA17F3B3E0F3622F9D"
+            BlueprintIdentifier = "6222D457076D339A6332DF3A"
             BuildableName = "iTerm2Pad.app"
             BlueprintName = "iTerm2Pad"
             ReferencedContainer = "container:iTerm2Pad.xcodeproj">
@@ -90,7 +90,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "81E936EA17F3B3E0F3622F9D"
+            BlueprintIdentifier = "6222D457076D339A6332DF3A"
             BuildableName = "iTerm2Pad.app"
             BlueprintName = "iTerm2Pad"
             ReferencedContainer = "container:iTerm2Pad.xcodeproj">

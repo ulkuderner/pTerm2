@@ -21,7 +21,7 @@ BUNDLE_ID = 'com.caglar.pTerm2'
 TEAM = 'W4A4C428H6'
 DEPLOYMENT_TARGET = '17.0'
 MARKETING_VERSION = '1.0'
-CURRENT_PROJECT_VERSION = '5'
+CURRENT_PROJECT_VERSION = '7'
 SWIFTTERM_URL = 'https://github.com/migueldeicaza/SwiftTerm.git'
 # 1.99+ pulls a build plugin that Xcode rejects without user trust.
 # 1.5.1 is the last simple iOS TerminalView release without that plugin.
@@ -137,6 +137,16 @@ link_package_product(project, target, ssh_pkg, 'SSHClient')
 link_package_product(project, target, shell_pkg, 'LocalShell')
 link_package_product(project, target, swiftterm_pkg, 'SwiftTerm')
 
+install_shell = target.new_shell_script_build_phase('Install sandbox zsh')
+install_shell.shell_script = <<~'SCRIPT'
+  set -eu
+  SRC="$SRCROOT/iTerm2Pad/Resources/Shell/omz"
+  DEST="$BUILT_PRODUCTS_DIR/$PRODUCT_NAME.app/Shell/omz"
+  rm -rf "$DEST"
+  mkdir -p "$(dirname "$DEST")"
+  cp -R "$SRC" "$DEST"
+SCRIPT
+
 target.add_dependency(provider_target)
 embed_phase = target.new_copy_files_build_phase('Embed Foundation Extensions')
 embed_phase.symbol_dst_subfolder_spec = :plug_ins
@@ -166,6 +176,16 @@ target.build_configurations.each do |config|
   settings['CODE_SIGN_ENTITLEMENTS'] = 'iTerm2Pad/Resources/iTerm2Pad.entitlements'
   settings['SWIFT_EMIT_LOC_STRINGS'] = 'YES'
   settings['VALIDATE_PRODUCT'] = 'YES' if config.name != 'Debug'
+  settings['OTHER_LDFLAGS[sdk=iphoneos*]'] = [
+    '$(inherited)',
+    '-force_load', '$(SRCROOT)/iTerm2Pad/Resources/Shell/libzshell.a',
+    '-liconv', '-lm'
+  ]
+end
+
+%w[ios_tty.c PtermZsh.c].each do |name|
+  path = File.join(APP_DIR, 'Terminal', name)
+  target.add_file_references([app_group.new_reference(path)])
 end
 
 # ---------------------------------------------------------------------------

@@ -23,6 +23,9 @@ final class ZshSession {
     private var history: [String] = []
     private var historyCursor = 0
     private var pendingEscape = ""
+    private var writeFD: Int32 = -1
+    private var translateNewlines = false
+    private var lastWasReturn = false
 
     static var accountHome: String {
         if let users = try? FileManager.default.contentsOfDirectory(atPath: "/Users") {
@@ -41,6 +44,10 @@ final class ZshSession {
             return
         }
         started = true
+        #if !targetEnvironment(simulator)
+        startBundledZsh(columns: columns, rows: rows)
+        return
+        #endif
         let zshBinary = "/bin/zsh"
         guard FileManager.default.isExecutableFile(atPath: zshBinary) else {
             startBuiltin()
@@ -54,6 +61,7 @@ final class ZshSession {
             return
         }
         master = masterFD
+        writeFD = masterFD
 
         var actions: posix_spawn_file_actions_t?
         posix_spawn_file_actions_init(&actions)
@@ -130,14 +138,15 @@ final class ZshSession {
             acceptBuiltin(data)
             return
         }
-        guard master >= 0, !data.isEmpty else {
+        let fd = writeFD >= 0 ? writeFD : master
+        guard fd >= 0, !data.isEmpty else {
             return
         }
         data.withUnsafeBytes { raw in
             guard let base = raw.baseAddress else {
                 return
             }
-            _ = write(master, base, data.count)
+            _ = write(fd, base, data.count)
         }
     }
 
@@ -152,6 +161,10 @@ final class ZshSession {
     func stop() {
         onExit = nil
         builtin = nil
+        if writeFD >= 0, writeFD != master {
+            close(writeFD)
+        }
+        writeFD = -1
         master = -1
         reader?.cancel()
         reader = nil
@@ -178,10 +191,145 @@ final class ZshSession {
         guard count > 0 else {
             return
         }
-        let data = Data(buffer.prefix(count))
-        DispatchQueue.main.async { [weak self] in
-            self?.onOutput?(data)
+        var output = Data()
+        if translateNewlines {
+            for byte in buffer.prefix(count) {
+                if byte == 10, !lastWasReturn {
+                    output.append(13)
+                }
+                output.append(byte)
+                lastWasReturn = byte == 13
+            }
+        } else {
+            output = Data(buffer.prefix(count))
         }
+        DispatchQueue.main.async { [weak self] in
+            self?.onOutput?(output)
+        }
+    }
+
+    /// iPad build. zsh and oh-my-zsh ship inside the app and talk over pipes.
+    /// openpty is not used.
+    private func startBundledZsh(columns: UInt16, rows: UInt16) {
+        let home = prepareSandboxHome()
+        guard let binary = Bundle.main.executableURL else {
+            startBuiltin()
+            return
+        }
+
+        var inputPipe: [Int32] = [0, 0]
+        var outputPipe: [Int32] = [0, 0]
+        guard pipe(&inputPipe) == 0, pipe(&outputPipe) == 0 else {
+            startBuiltin()
+            return
+        }
+
+        var actions: posix_spawn_file_actions_t?
+        posix_spawn_file_actions_init(&actions)
+        posix_spawn_file_actions_adddup2(&actions, inputPipe[0], STDIN_FILENO)
+        posix_spawn_file_actions_adddup2(&actions, outputPipe[1], STDOUT_FILENO)
+        posix_spawn_file_actions_adddup2(&actions, outputPipe[1], STDERR_FILENO)
+        posix_spawn_file_actions_addclose(&actions, inputPipe[1])
+        posix_spawn_file_actions_addclose(&actions, outputPipe[0])
+
+        var attr: posix_spawnattr_t?
+        posix_spawnattr_init(&attr)
+        defer {
+            posix_spawn_file_actions_destroy(&actions)
+            posix_spawnattr_destroy(&attr)
+        }
+
+        let environment = [
+            "HOME=\(home.path)",
+            "ZDOTDIR=\(home.path)",
+            "USER=mobile",
+            "LOGNAME=mobile",
+            "SHELL=\(binary.path)",
+            "TERM=xterm-256color",
+            "COLORTERM=truecolor",
+            "LANG=en_US.UTF-8",
+            "LC_ALL=en_US.UTF-8",
+            "COLUMNS=\(columns)",
+            "LINES=\(rows)",
+            "PATH=/usr/bin:/bin"
+        ]
+        let arguments = [binary.path, "--pterm-zsh"]
+        var argv: [UnsafeMutablePointer<CChar>?] = arguments.map { strdup($0) }
+        argv.append(nil)
+        var env: [UnsafeMutablePointer<CChar>?] = environment.map { strdup($0) }
+        env.append(nil)
+        defer {
+            argv.forEach { free($0) }
+            env.forEach { free($0) }
+        }
+
+        var pid: pid_t = 0
+        let result = argv.withUnsafeMutableBufferPointer { argvBuf in
+            env.withUnsafeMutableBufferPointer { envBuf in
+                posix_spawn(&pid, binary.path, &actions, &attr, argvBuf.baseAddress, envBuf.baseAddress)
+            }
+        }
+        close(inputPipe[0])
+        close(outputPipe[1])
+        guard result == 0 else {
+            close(inputPipe[1])
+            close(outputPipe[0])
+            emit("zsh: could not start in the sandbox (\(result))\r\n")
+            startBuiltin()
+            return
+        }
+
+        child = pid
+        master = outputPipe[0]
+        writeFD = inputPipe[1]
+        translateNewlines = true
+        let process = DispatchSource.makeProcessSource(identifier: pid, eventMask: .exit, queue: .main)
+        process.setEventHandler { [weak self] in
+            self?.noteExit()
+        }
+        watch = process
+        process.resume()
+        let source = DispatchSource.makeReadSource(fileDescriptor: outputPipe[0], queue: .global(qos: .userInteractive))
+        source.setEventHandler { [weak self] in
+            self?.readAvailable()
+        }
+        source.setCancelHandler {
+            close(outputPipe[0])
+        }
+        reader = source
+        source.resume()
+    }
+
+    private func prepareSandboxHome() -> URL {
+        let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+        let fileManager = FileManager.default
+        let omz = home.appendingPathComponent(".oh-my-zsh", isDirectory: true)
+        let marker = omz.appendingPathComponent("pterm2-omz-version")
+        let bundled = Bundle.main.bundleURL.appendingPathComponent("Shell/omz", isDirectory: true)
+        if !fileManager.fileExists(atPath: marker.path),
+           fileManager.fileExists(atPath: bundled.appendingPathComponent("oh-my-zsh.sh").path) {
+            try? fileManager.removeItem(at: omz)
+            try? fileManager.copyItem(at: bundled, to: omz)
+        }
+        try? fileManager.createDirectory(at: omz.appendingPathComponent("custom", isDirectory: true),
+                                         withIntermediateDirectories: true)
+        try? fileManager.createDirectory(at: omz.appendingPathComponent("cache", isDirectory: true),
+                                         withIntermediateDirectories: true)
+        let zshrc = home.appendingPathComponent(".zshrc")
+        if !fileManager.fileExists(atPath: zshrc.path) {
+            let text = """
+            export ZSH="$HOME/.oh-my-zsh"
+            export ZSH_THEME="robbyrussell"
+            export DISABLE_AUTO_UPDATE=true
+            export DISABLE_UPDATE_PROMPT=true
+            export DISABLE_MAGIC_FUNCTIONS=true
+            fpath=("$ZSH/functions" $fpath)
+            source "$ZSH/oh-my-zsh.sh"
+            cd "$HOME"
+            """
+            try? text.write(to: zshrc, atomically: true, encoding: .utf8)
+        }
+        return home
     }
 
     private func noteExit() {
