@@ -223,6 +223,12 @@ final class ZshSession {
         environment["PTERM_APP"] = executable.path
         environment["PTERM_LAUNCH_DIR"] = home.appendingPathComponent("Library/Caches/pterm-launch").path
         environment["PTERM_CMD_DIR"] = home.appendingPathComponent("Library/Caches/pterm-cmd").path
+        if CommandLine.arguments.contains("-pterm-strip-env") {
+            environment["HOME"] = "/var/mobile"
+            environment.removeValue(forKey: "ZDOTDIR")
+            environment.removeValue(forKey: "PTERM_ZSHRC")
+            environment.removeValue(forKey: "PTERM_CMD_DIR")
+        }
         let arguments = [executable.path, "--pterm-zsh"]
         var argv: [UnsafeMutablePointer<CChar>?] = arguments.map { strdup($0) }
         argv.append(nil)

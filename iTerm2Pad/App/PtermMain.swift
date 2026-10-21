@@ -10,6 +10,21 @@ enum PtermMain {
             exit(PtermExec.run())
         }
         if CommandLine.arguments.contains("--pterm-zsh") {
+            // iPad can drop the environment passed to the second process.
+            // The container path is still available, so rebuild it here.
+            let home = NSHomeDirectory()
+            setenv("HOME", home, 1)
+            setenv("ZDOTDIR", home, 1)
+            setenv("USER", "mobile", 1)
+            setenv("LOGNAME", "mobile", 1)
+            setenv("TERM", "xterm-256color", 1)
+            setenv("LANG", "en_US.UTF-8", 1)
+            setenv("PTERM_ZSHRC", (home as NSString).appendingPathComponent(".zshrc"), 1)
+            setenv("PTERM_CMD_DIR", (home as NSString).appendingPathComponent("Library/Caches/pterm-cmd"), 1)
+            setenv("PTERM_LAUNCH_DIR", (home as NSString).appendingPathComponent("Library/Caches/pterm-launch"), 1)
+            if getenv("PTERM_APP") == nil, let executable = Bundle.main.executablePath {
+                setenv("PTERM_APP", executable, 1)
+            }
             exit(pterm_enter_zsh())
         }
         iTerm2PadApp.main()

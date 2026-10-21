@@ -109,15 +109,15 @@ final class PadFlowUITests: XCTestCase {
 
     func testTypedShellCommands() throws {
         let app = XCUIApplication()
-        app.launchArguments += ["-pterm-shell", "-pterm-uitest"]
+        app.launchArguments += ["-pterm-shell", "-pterm-uitest", "-pterm-strip-env"]
         app.launch()
 
         let pane = app.descendants(matching: .any)["TerminalPane"]
         XCTAssertTrue(pane.waitForExistence(timeout: 20))
         XCTAssertTrue(waitUntil(timeout: 25) {
             let text = self.screenText(pane)
-            return text.contains("~") || text.contains("%")
-        }, "prompt did not appear: \(screenText(pane))")
+            return text.contains("~") && !text.contains("localhost%")
+        }, "oh-my-zsh prompt missing: \(screenText(pane))")
 
         pane.tap()
         typeCommand("ls", in: app)
