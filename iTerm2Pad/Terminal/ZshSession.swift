@@ -145,8 +145,11 @@ final class ZshSession {
     /// openpty is not used.
     private func startBundledZsh(columns: UInt16, rows: UInt16) {
         let home = prepareSandboxHome()
+        let commandName = "cmd-\(UUID().uuidString)"
+        let commandDir = ShellRoot.commandDirectory(id: commandName)
         setenv("HOME", home.path, 1)
         setenv("ZDOTDIR", home.path, 1)
+        setenv("PTERM_ROOT", ShellRoot.root.path, 1)
         setenv("USER", "mobile", 1)
         setenv("LOGNAME", "mobile", 1)
         setenv("TERM", "xterm-256color", 1)
@@ -160,12 +163,13 @@ final class ZshSession {
             setenv("PTERM_APP", executable.path, 1)
         }
         let launchDir = home.appendingPathComponent("Library/Caches/pterm-launch", isDirectory: true)
-        let commandDir = home.appendingPathComponent("Library/Caches/pterm-cmd", isDirectory: true)
         try? FileManager.default.createDirectory(at: launchDir, withIntermediateDirectories: true)
         try? FileManager.default.createDirectory(at: commandDir, withIntermediateDirectories: true)
         setenv("PTERM_LAUNCH_DIR", launchDir.path, 1)
         setenv("PTERM_CMD_DIR", commandDir.path, 1)
         home.path.withCString { pterm_set_shell_home($0) }
+        setenv("PTERM_CMD_DIR", commandDir.path, 1)
+        setenv("PTERM_ROOT", ShellRoot.root.path, 1)
         watchLaunches(at: launchDir)
         watchCommands(at: commandDir)
         if CommandLine.arguments.contains("-pterm-uitest") {
@@ -183,7 +187,7 @@ final class ZshSession {
         let forceInProcess = CommandLine.arguments.contains("-pterm-inprocess")
         if !forceInProcess,
            let executable = Bundle.main.executableURL,
-           spawnZsh(executable: executable, socket: pair[1], parent: pair[0], home: home, columns: columns, rows: rows) {
+           spawnZsh(executable: executable, socket: pair[1], parent: pair[0], home: home, commandDir: commandDir, columns: columns, rows: rows) {
             close(pair[1])
             attach(pair[0])
             return
@@ -200,7 +204,7 @@ final class ZshSession {
         attach(pair[0])
     }
 
-    private func spawnZsh(executable: URL, socket: Int32, parent: Int32, home: URL, columns: UInt16, rows: UInt16) -> Bool {
+    private func spawnZsh(executable: URL, socket: Int32, parent: Int32, home: URL, commandDir: URL, columns: UInt16, rows: UInt16) -> Bool {
         var actions: posix_spawn_file_actions_t?
         posix_spawn_file_actions_init(&actions)
         posix_spawn_file_actions_adddup2(&actions, socket, STDIN_FILENO)
@@ -214,26 +218,38 @@ final class ZshSession {
             posix_spawn_file_actions_destroy(&actions)
             posix_spawnattr_destroy(&attr)
         }
-        var environment = ProcessInfo.processInfo.environment
-        environment["HOME"] = home.path
-        environment["ZDOTDIR"] = home.path
-        environment["PTERM_ZSHRC"] = home.appendingPathComponent(".zshrc").path
-        environment["USER"] = "mobile"
-        environment["LOGNAME"] = "mobile"
-        environment["TERM"] = "xterm-256color"
-        environment["COLUMNS"] = "\(columns)"
-        environment["LINES"] = "\(rows)"
-        environment["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin"
-        environment["PTERM_APP"] = executable.path
-        environment["PTERM_LAUNCH_DIR"] = home.appendingPathComponent("Library/Caches/pterm-launch").path
-        environment["PTERM_CMD_DIR"] = home.appendingPathComponent("Library/Caches/pterm-cmd").path
+        var environment = [
+            "HOME": home.path,
+            "ZDOTDIR": home.path,
+            "PTERM_ZSHRC": home.appendingPathComponent(".zshrc").path,
+            "PTERM_ROOT": ShellRoot.root.path,
+            "USER": "mobile",
+            "LOGNAME": "mobile",
+            "TERM": "xterm-256color",
+            "LANG": "en_US.UTF-8",
+            "COLUMNS": "\(columns)",
+            "LINES": "\(rows)",
+            "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+            "PTERM_APP": executable.path,
+            "PTERM_LAUNCH_DIR": home.appendingPathComponent("Library/Caches/pterm-launch").path,
+            "PTERM_CMD_DIR": commandDir.path
+        ]
+        if CommandLine.arguments.contains("-pterm-uitest") {
+            environment["PTERM_UTEST"] = "1"
+        }
+        let inherited = ProcessInfo.processInfo.environment
+        if inherited["SIMULATOR_ROOT"] != nil || inherited["SIMULATOR_UDID"] != nil {
+            for (key, value) in inherited where key.hasPrefix("DYLD_") || key.hasPrefix("SIMULATOR_") {
+                environment[key] = value
+            }
+        }
         if CommandLine.arguments.contains("-pterm-strip-env") {
             environment["HOME"] = "/var/mobile"
             environment.removeValue(forKey: "ZDOTDIR")
             environment.removeValue(forKey: "PTERM_ZSHRC")
             environment.removeValue(forKey: "PTERM_CMD_DIR")
         }
-        let arguments = [executable.path, "--pterm-zsh"]
+        let arguments = [executable.path, "--pterm-zsh", "--pterm-home", home.path, "--pterm-root", ShellRoot.root.path, "--pterm-cmd", commandDir.path]
         var argv: [UnsafeMutablePointer<CChar>?] = arguments.map { strdup($0) }
         argv.append(nil)
         var env: [UnsafeMutablePointer<CChar>?] = []
@@ -281,8 +297,12 @@ final class ZshSession {
     }
 
     private func prepareSandboxHome() -> URL {
-        let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
         let fileManager = FileManager.default
+        let root = ShellRoot.root
+        let home = ShellRoot.mobile
+        try? fileManager.createDirectory(at: root.appendingPathComponent("tmp"), withIntermediateDirectories: true)
+        try? fileManager.createDirectory(at: root.appendingPathComponent("bin"), withIntermediateDirectories: true)
+        try? fileManager.createDirectory(at: home, withIntermediateDirectories: true)
         let omz = home.appendingPathComponent(".oh-my-zsh", isDirectory: true)
         let marker = omz.appendingPathComponent("pterm2-omz-version")
         let bundled = Bundle.main.bundleURL.appendingPathComponent("Shell/omz", isDirectory: true)
@@ -302,7 +322,7 @@ final class ZshSession {
         try? fileManager.createDirectory(at: prefix.appendingPathComponent("Cellar"), withIntermediateDirectories: true)
         let zshrc = home.appendingPathComponent(".zshrc")
         let stamp = home.appendingPathComponent(".pterm2-zshrc")
-        if (try? String(contentsOf: stamp, encoding: .utf8)) != "28" {
+        if (try? String(contentsOf: stamp, encoding: .utf8)) != "30" {
             let bundledP10k = Bundle.main.bundleURL.appendingPathComponent("Shell/omz/p10k.zsh")
             let installedP10k = home.appendingPathComponent(".p10k.zsh")
             if fileManager.fileExists(atPath: bundledP10k.path) {
@@ -322,12 +342,29 @@ final class ZshSession {
             export DISABLE_MAGIC_FUNCTIONS=true
             export ZSH_DISABLE_COMPFIX=true
             export GITSTATUS_AUTO_INSTALL=0
-            fpath=("$ZSH/functions" $fpath)
+            setopt extended_glob
+            fpath=($ZSH/completions/Base/*(/N) $ZSH/completions/Zsh/*(/N) $ZSH/completions/Unix/Type(/N) $ZSH/completions $ZSH/functions $fpath)
+            autoload -Uz compinit
+            compinit -u -d "$HOME/.zcompdump"
             plugins=(git bgnotify sudo history dotenv)
             source "$ZSH/oh-my-zsh.sh"
             unsetopt xtrace
+            bindkey '^I' expand-or-complete
+            zstyle ':completion:*' menu select
             [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
             cd "$HOME"
+            if [[ -n $PTERM_ROOT ]]; then
+              cd() {
+                builtin cd "$@" || return
+                case $PWD in
+                  $PTERM_ROOT|$PTERM_ROOT/*) ;;
+                  *) builtin cd -- "$PTERM_ROOT/home/mobile" ;;
+                esac
+              }
+            fi
+            if [[ -n $PTERM_UTEST ]]; then
+              print -r -- "pterm-complete:$(bindkey '^I')"
+            fi
             pterm_arm() {
               emulate -L zsh
               local dir=$PTERM_CMD_DIR
@@ -367,8 +404,15 @@ final class ZshSession {
               git status
             fi
             """
-            try? text.write(to: zshrc, atomically: true, encoding: .utf8)
-            try? Data("28".utf8).write(to: stamp)
+            do {
+                try text.write(to: zshrc, atomically: true, encoding: .utf8)
+                guard fileManager.isReadableFile(atPath: zshrc.path) else {
+                    throw CocoaError(.fileWriteUnknown)
+                }
+                try Data("30".utf8).write(to: stamp)
+            } catch {
+                fputs("pterm: could not write shell startup\n", stderr)
+            }
         }
         return home
     }
@@ -414,8 +458,7 @@ final class ZshSession {
             if argv.last?.isEmpty == true {
                 argv.removeLast()
             }
-            let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
-            let session = ShellSession(home: home)
+            let session = ShellSession(home: ShellRoot.mobile, root: ShellRoot.root)
             session.useDirectory(pwd)
             var text = ""
             session.output = { text += $0 }
@@ -456,8 +499,7 @@ final class ZshSession {
     /// Line editor for the iPad sandbox. iPadOS returns EPERM from openpty and
     /// does not ship /bin/zsh, so the embedded command set runs in-process.
     private func startBuiltin() {
-        let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
-        let shell = ShellSession(home: home)
+        let shell = ShellSession(home: ShellRoot.mobile, root: ShellRoot.root)
         shell.output = { [weak self] text in
             self?.writeTerminal(text)
         }
@@ -492,6 +534,11 @@ final class ZshSession {
                 }
                 historyCursor = history.count
                 line = ""
+                let trimmed = command.trimmingCharacters(in: .whitespaces)
+                if trimmed == "exit" || trimmed == "logout" {
+                    onExit?()
+                    return
+                }
                 _ = builtin?.run(command)
                 writeTerminal(builtin?.prompt() ?? "")
             case 0x7f, 0x08:

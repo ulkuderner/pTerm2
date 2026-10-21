@@ -9,6 +9,7 @@
 extern int zsh_main(int argc, char **argv);
 extern void pterm_bind_thread(int fd, int columns, int rows);
 extern void pterm_activate_tty(void);
+extern void pterm_mark_inprocess(void);
 
 struct pterm_job {
     int fd;
@@ -19,6 +20,20 @@ struct pterm_job {
 static pthread_mutex_t pterm_zsh_lock = PTHREAD_MUTEX_INITIALIZER;
 static int pterm_zsh_running = 0;
 static char pterm_home_rc[1024];
+
+void pterm_release_zsh(void) {
+    pthread_mutex_lock(&pterm_zsh_lock);
+    pterm_zsh_running = 0;
+    pthread_mutex_unlock(&pterm_zsh_lock);
+}
+
+int pterm_try_chroot(const char *root) {
+    if (!root || !*root || chroot(root) != 0) {
+        return 0;
+    }
+    chdir("/home/mobile");
+    return 1;
+}
 
 const char *pterm_zshrc_path(void) {
     return pterm_home_rc[0] ? pterm_home_rc : NULL;
@@ -52,7 +67,9 @@ static void *pterm_thread(void *raw) {
         chdir(home);
     }
     pterm_bind_thread(fd, columns, rows);
+    pterm_mark_inprocess();
     zsh_main(3, argv);
+    pterm_release_zsh();
     pthread_mutex_lock(&pterm_zsh_lock);
     pterm_zsh_running = 0;
     pthread_mutex_unlock(&pterm_zsh_lock);

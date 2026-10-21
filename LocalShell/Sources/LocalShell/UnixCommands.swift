@@ -21,7 +21,7 @@ struct CDCommand: ShellCommand {
         guard FileManager.default.fileExists(atPath: target.path, isDirectory: &isDir), isDir.boolValue else {
             throw ShellError.failed("cd: \(target.path): No such file or directory")
         }
-        context.workingDirectory = target
+        context.workingDirectory = confine(target, to: context.root)
         return 0
     }
 }
@@ -257,14 +257,24 @@ struct WCCommand: ShellCommand {
 }
 
 func resolve(_ path: String, relativeTo context: CommandContext) -> URL {
+    let raw: URL
     if path == "~" {
-        return context.home
+        raw = context.home
+    } else if path.hasPrefix("~/") {
+        raw = context.home.appendingPathComponent(String(path.dropFirst(2)))
+    } else if path.hasPrefix("/") {
+        raw = URL(fileURLWithPath: path)
+    } else {
+        raw = context.workingDirectory.appendingPathComponent(path)
     }
-    if path.hasPrefix("~/") {
-        return context.home.appendingPathComponent(String(path.dropFirst(2)))
+    return confine(raw, to: context.root)
+}
+
+func confine(_ url: URL, to root: URL) -> URL {
+    let rootPath = root.standardizedFileURL.path
+    let path = url.standardizedFileURL.path
+    if path == rootPath || path.hasPrefix(rootPath + "/") {
+        return url
     }
-    if path.hasPrefix("/") {
-        return URL(fileURLWithPath: path)
-    }
-    return context.workingDirectory.appendingPathComponent(path)
+    return root
 }

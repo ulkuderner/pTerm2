@@ -10,6 +10,34 @@
 
 /* Active only on a zsh thread. The interface thread keeps the system calls. */
 static _Thread_local int pterm_tty_active = 0;
+static _Thread_local int pterm_in_process = 0;
+
+void pterm_mark_inprocess(void) {
+    pterm_in_process = 1;
+}
+
+extern void pterm_release_zsh(void);
+int pterm_tty_fd(void);
+
+/* In-process zsh shares the app process. Its exit must end the thread,
+ * not the whole iPad app, so the pane can open a new shell. */
+void _exit(int status) {
+    if (pterm_in_process) {
+        int fd = pterm_tty_fd();
+        pterm_in_process = 0;
+        pterm_release_zsh();
+        if (fd > 2) {
+            close(fd);
+        }
+        pthread_exit(NULL);
+    }
+    void (*real_exit)(int) = dlsym(RTLD_NEXT, "_exit");
+    if (real_exit) {
+        real_exit(status);
+    }
+    for (;;) {
+    }
+}
 static _Thread_local int pterm_fd = -1;
 static _Thread_local int pterm_stdio_ready = 0;
 static _Thread_local dev_t pterm_out_dev = 0;

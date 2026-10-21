@@ -124,7 +124,7 @@ final class PadFlowUITests: XCTestCase {
         XCTAssertTrue(pane.waitForExistence(timeout: 20))
         XCTAssertTrue(waitUntil(timeout: 25) {
             let text = self.screenText(pane)
-            return text.contains("~") && !text.contains("localhost%") && !text.contains("set-mark-command")
+            return text.contains("~") && text.contains("expand-or-complete") && !text.contains("localhost%") && !text.contains("set-mark-command")
         }, "shell startup did not finish: \(screenText(pane))")
         RunLoop.current.run(until: Date().addingTimeInterval(2))
 

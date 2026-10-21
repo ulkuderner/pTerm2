@@ -6,8 +6,9 @@ public final class ShellSession: @unchecked Sendable {
     public private(set) var context: CommandContext
     public var output: ((String) -> Void)?
 
-    public init(home: URL) {
+    public init(home: URL, root: URL? = nil) {
         let documents = home
+        let jail = root ?? home
         context = CommandContext(
             home: documents,
             workingDirectory: documents,
@@ -18,7 +19,8 @@ public final class ShellSession: @unchecked Sendable {
                 "TERM": "xterm-256color"
             ],
             stdout: { _ in },
-            stderr: { _ in }
+            stderr: { _ in },
+            root: jail
         )
         context.stdout = { [weak self] text in self?.output?(text) }
         context.stderr = { [weak self] text in self?.output?(text) }
@@ -43,7 +45,8 @@ public final class ShellSession: @unchecked Sendable {
 
     public func useDirectory(_ path: String) {
         let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
-        context.workingDirectory = URL(fileURLWithPath: trimmed.isEmpty ? context.home.path : trimmed, isDirectory: true)
+        let chosen = URL(fileURLWithPath: trimmed.isEmpty ? context.home.path : trimmed, isDirectory: true)
+        context.workingDirectory = confine(chosen, to: context.root)
     }
 
     public func prompt() -> String {

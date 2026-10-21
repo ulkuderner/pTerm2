@@ -3,6 +3,22 @@ import LocalShell
 import SSHClient
 import SwiftUI
 
+/// Every pane shares this directory. iPadOS denies chroot(2), so the shell
+/// treats it as `/` by refusing to leave it.
+enum ShellRoot {
+    /// The app container is the shell's root. iPadOS denies chroot(2),
+    /// and a nested directory would hide Documents.
+    static var root: URL {
+        URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+    }
+
+    static var mobile: URL { root }
+
+    static func commandDirectory(id: String) -> URL {
+        root.appendingPathComponent("Library/Caches/pterm-cmd/\(id)", isDirectory: true)
+    }
+}
+
 @main
 enum PtermMain {
     static func main() {
@@ -10,10 +26,18 @@ enum PtermMain {
             exit(PtermExec.run())
         }
         if CommandLine.arguments.contains("--pterm-zsh") {
-            // iPad can drop the environment passed to the second process.
-            // The container path is still available, so rebuild it here.
-            let home = NSHomeDirectory()
+            // A spawned copy of the app does not get the container as
+            // NSHomeDirectory(); the parent passes the directory it prepared.
+            let mobile = Self.argument(after: "--pterm-home") ?? ShellRoot.mobile.path
+            let root = Self.argument(after: "--pterm-root") ?? mobile
+            let jailed = root.withCString { pterm_try_chroot($0) }
+            let home = jailed == 0 ? mobile : "/home/mobile"
             home.withCString { pterm_set_shell_home($0) }
+            if let command = Self.argument(after: "--pterm-cmd") {
+                let directory = jailed == 0 ? command : "/Library/Caches/pterm-cmd/" + URL(fileURLWithPath: command).lastPathComponent
+                setenv("PTERM_CMD_DIR", directory, 1)
+            }
+            setenv("PTERM_ROOT", jailed == 0 ? root : "/", 1)
             setenv("USER", "mobile", 1)
             setenv("LOGNAME", "mobile", 1)
             setenv("TERM", "xterm-256color", 1)
@@ -24,6 +48,14 @@ enum PtermMain {
             exit(pterm_enter_zsh())
         }
         iTerm2PadApp.main()
+    }
+
+    private static func argument(after flag: String) -> String? {
+        let args = CommandLine.arguments
+        guard let index = args.firstIndex(of: flag), index + 1 < args.count else {
+            return nil
+        }
+        return args[index + 1]
     }
 }
 
@@ -62,3 +94,6 @@ func pterm_enter_zsh() -> Int32
 
 @_silgen_name("pterm_set_shell_home")
 func pterm_set_shell_home(_ home: UnsafePointer<CChar>)
+
+@_silgen_name("pterm_try_chroot")
+func pterm_try_chroot(_ root: UnsafePointer<CChar>) -> Int32

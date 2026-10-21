@@ -3,6 +3,7 @@ import PadSystem
 
 public struct CommandContext {
     public var home: URL
+    public var root: URL
     public var workingDirectory: URL
     public var environment: [String: String]
     public var stdout: (String) -> Void
@@ -12,8 +13,10 @@ public struct CommandContext {
                 workingDirectory: URL,
                 environment: [String: String] = [:],
                 stdout: @escaping (String) -> Void,
-                stderr: @escaping (String) -> Void) {
+                stderr: @escaping (String) -> Void,
+                root: URL? = nil) {
         self.home = home
+        self.root = root ?? home
         self.workingDirectory = workingDirectory
         self.environment = environment
         self.stdout = stdout

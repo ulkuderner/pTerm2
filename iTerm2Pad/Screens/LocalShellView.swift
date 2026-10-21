@@ -462,9 +462,10 @@ final class ShellCanvas: UIView {
             live.insert(key)
             let divider = self.divider(key)
             let gap = Self.separatorGap
+            let hit: CGFloat = 44
             divider.frame = stacked
-                ? CGRect(x: rect.minX, y: frames[index].maxY, width: rect.width, height: gap)
-                : CGRect(x: frames[index].maxX, y: rect.minY, width: gap, height: rect.height)
+                ? CGRect(x: rect.minX, y: frames[index].maxY - (hit - gap) / 2, width: rect.width, height: hit)
+                : CGRect(x: frames[index].maxX - (hit - gap) / 2, y: rect.minY, width: hit, height: rect.height)
             divider.stacked = stacked
             divider.accessibilityIdentifier = "PaneDivider"
             let capturedSpan = span
@@ -602,7 +603,9 @@ private final class SplitDivider: UIView {
         knob.backgroundColor = .tertiaryLabel
         knob.layer.cornerCurve = .continuous
         addSubview(knob)
-        addGestureRecognizer(UIPanGestureRecognizer(target: self, action: #selector(drag(_:))))
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(drag(_:)))
+        pan.cancelsTouchesInView = true
+        addGestureRecognizer(pan)
     }
 
     required init?(coder: NSCoder) {
@@ -610,8 +613,7 @@ private final class SplitDivider: UIView {
     }
 
     override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
-        let hit = bounds.insetBy(dx: stacked ? 0 : -17, dy: stacked ? -17 : 0)
-        return hit.contains(point)
+        bounds.contains(point)
     }
 
     override func layoutSubviews() {
