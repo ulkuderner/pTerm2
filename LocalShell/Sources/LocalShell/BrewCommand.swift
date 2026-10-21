@@ -27,7 +27,7 @@ struct BrewCommand: ShellCommand {
             if pad_python3_ready() != 0 {
                 context.stdout("brew install PACKAGE uses the embedded CPython for pure-Python packages.\n")
             } else {
-                context.stdout("Native macOS bottles cannot start on iPadOS. Python packages install when CPython is linked in.\n")
+                context.stdout("This list is the whole brew. Extra packages need CPython, which is not in this build.\n")
             }
             return 0
         case "install":

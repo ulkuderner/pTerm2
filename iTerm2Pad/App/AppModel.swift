@@ -42,6 +42,8 @@ final class AppModel {
     var identities: [SSHIdentity] = []
     var activeSession: LiveSession?
     var errorMessage: String?
+    var sshPassword = ""
+    var sshPasswordPrompt: String?
 
     let hostStore = HostStore()
     let keychain = KeychainStore()
@@ -91,12 +93,18 @@ final class AppModel {
         let pem = host.identityID.flatMap { id in
             identities.first(where: { $0.id == id }).flatMap { keychain.pem(for: $0) }
         }
-        let session = LiveSession(host: host, privateKeyPEM: pem, password: password)
-        do {
-            try session.start()
-            activeSession = session
-        } catch {
-            errorMessage = error.localizedDescription
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let session = LiveSession(host: host, privateKeyPEM: pem, password: password)
+            do {
+                try session.start()
+                DispatchQueue.main.async {
+                    self?.activeSession = session
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self?.errorMessage = error.localizedDescription
+                }
+            }
         }
     }
 
@@ -104,8 +112,31 @@ final class AppModel {
         guard let pending = SSHLaunchMailbox.pending else {
             return
         }
+        if pending.password == nil && pending.host.identityID == nil {
+            sshPassword = ""
+            sshPasswordPrompt = "\(pending.host.username)@\(pending.host.hostname)"
+            return
+        }
         SSHLaunchMailbox.pending = nil
         connect(pending.host, password: pending.password)
+    }
+
+    func submitSSHPassword() {
+        guard let pending = SSHLaunchMailbox.pending else {
+            sshPasswordPrompt = nil
+            return
+        }
+        let password = sshPassword
+        sshPassword = ""
+        sshPasswordPrompt = nil
+        SSHLaunchMailbox.pending = nil
+        connect(pending.host, password: password)
+    }
+
+    func cancelSSHPassword() {
+        sshPassword = ""
+        sshPasswordPrompt = nil
+        SSHLaunchMailbox.pending = nil
     }
 }
 

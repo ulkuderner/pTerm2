@@ -615,7 +615,7 @@ final class ZshSession {
         }
         writeTerminal(shell.prompt())
         if CommandLine.arguments.contains("-pterm-selftest") {
-            for command in ["ls", "brew --prefix", "git status"] {
+            for command in ["ls", "brew", "git status"] {
                 writeTerminal("\(command)\r\n")
                 _ = shell.run(command)
             }
@@ -647,6 +647,9 @@ final class ZshSession {
                     return
                 }
                 _ = builtin?.run(command)
+                if SSHLaunchMailbox.pending != nil {
+                    NotificationCenter.default.post(name: .ptermSSHLaunch, object: nil)
+                }
                 writeTerminal(builtin?.prompt() ?? "")
             case 0x7f, 0x08:
                 guard !line.isEmpty else { continue }

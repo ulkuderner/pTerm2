@@ -38,6 +38,15 @@ struct HomeView: View {
         .onReceive(NotificationCenter.default.publisher(for: .ptermSSHLaunch)) { _ in
             model.consumePendingSSHLaunch()
         }
+        .sheet(isPresented: Binding(
+            get: { model.sshPasswordPrompt != nil },
+            set: { if !$0 { model.cancelSSHPassword() } }
+        )) {
+            SSHPasswordSheet(host: model.sshPasswordPrompt ?? "",
+                             password: $model.sshPassword,
+                             submit: { model.submitSSHPassword() },
+                             cancel: { model.cancelSSHPassword() })
+        }
     }
 
     private var sessionBinding: Binding<LiveSession?> {
@@ -93,6 +102,39 @@ private struct PadTabs: View {
             SettingsView()
                 .tabItem { Text(AppModel.Tab.settings.title) }
                 .tag(AppModel.Tab.settings)
+        }
+    }
+}
+
+private struct SSHPasswordSheet: View {
+    var host: String
+    @Binding var password: String
+    var submit: () -> Void
+    var cancel: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                SecureField(String(localized: "Pad.SSH.Password",
+                                   defaultValue: "Password",
+                                   comment: "Password field for an ssh command typed in the shell"),
+                            text: $password)
+            }
+            .navigationTitle(host)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(String(localized: "Pad.SSH.Cancel",
+                                  defaultValue: "Cancel",
+                                  comment: "Dismiss the SSH password sheet"),
+                           role: .cancel, action: cancel)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(String(localized: "Pad.SSH.Connect",
+                                  defaultValue: "Connect",
+                                  comment: "Start the SSH session with the typed password"),
+                           action: submit)
+                }
+            }
         }
     }
 }

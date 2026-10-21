@@ -78,6 +78,12 @@ struct SSHCommand: ShellCommand {
             }
         }
         _ = identity
+        guard SSHSession.backendReady else {
+            context.stderr(String(localized: "Shell.SSHLibraryMissing",
+                                  defaultValue: "ssh cannot connect: libssh2 is not linked into this build.\n",
+                                  comment: "Shown when ssh is typed and the SSH library was not compiled in."))
+            return 1
+        }
         SSHLaunchMailbox.pending = SSHLaunchRequest(host: host, password: nil)
         context.stdout(String(localized: "Shell.SSHOpening",
                               defaultValue: "Opening SSH session to \(user)@\(hostName)…\n",

@@ -47,6 +47,28 @@ static int tcp_connect(const char *host, int port, char *errbuf, size_t errlen) 
     return sock;
 }
 
+static char kbd_password[256];
+
+static void keyboard_callback(const char *name, int name_len,
+                              const char *instruction, int instruction_len,
+                              int num_prompts,
+                              const LIBSSH2_USERAUTH_KBDINT_PROMPT *prompts,
+                              LIBSSH2_USERAUTH_KBDINT_RESPONSE *responses,
+                              void **abstract) {
+    (void)name; (void)name_len; (void)instruction; (void)instruction_len;
+    (void)prompts; (void)abstract;
+    for (int i = 0; i < num_prompts; i++) {
+        size_t length = strlen(kbd_password);
+        responses[i].text = malloc(length + 1);
+        if (!responses[i].text) {
+            responses[i].length = 0;
+            continue;
+        }
+        memcpy(responses[i].text, kbd_password, length + 1);
+        responses[i].length = (unsigned int)length;
+    }
+}
+
 static int authenticate(LIBSSH2_SESSION *session,
                         const char *user,
                         const char *private_key_pem,
@@ -68,6 +90,12 @@ static int authenticate(LIBSSH2_SESSION *session,
     }
     if (password && password[0]) {
         int rc = libssh2_userauth_password(session, user, password);
+        if (rc == 0) {
+            return 0;
+        }
+        strncpy(kbd_password, password, sizeof(kbd_password) - 1);
+        kbd_password[sizeof(kbd_password) - 1] = '\0';
+        rc = libssh2_userauth_keyboard_interactive(session, user, keyboard_callback);
         if (rc == 0) {
             return 0;
         }
