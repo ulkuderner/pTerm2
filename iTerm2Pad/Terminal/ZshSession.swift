@@ -165,6 +165,7 @@ final class ZshSession {
         try? FileManager.default.createDirectory(at: commandDir, withIntermediateDirectories: true)
         setenv("PTERM_LAUNCH_DIR", launchDir.path, 1)
         setenv("PTERM_CMD_DIR", commandDir.path, 1)
+        home.path.withCString { pterm_set_shell_home($0) }
         watchLaunches(at: launchDir)
         watchCommands(at: commandDir)
         if CommandLine.arguments.contains("-pterm-uitest") {
@@ -179,12 +180,15 @@ final class ZshSession {
         }
         var noSignal: Int32 = 1
         setsockopt(pair[0], SOL_SOCKET, SO_NOSIGPIPE, &noSignal, socklen_t(MemoryLayout<Int32>.size))
-        if let executable = Bundle.main.executableURL,
+        let forceInProcess = CommandLine.arguments.contains("-pterm-inprocess")
+        if !forceInProcess,
+           let executable = Bundle.main.executableURL,
            spawnZsh(executable: executable, socket: pair[1], parent: pair[0], home: home, columns: columns, rows: rows) {
             close(pair[1])
             attach(pair[0])
             return
         }
+        emit("pterm: in-process shell\r\n")
         let result = pterm_start_zsh(pair[1], Int32(columns), Int32(rows))
         guard result == 0 else {
             close(pair[0])
@@ -298,7 +302,7 @@ final class ZshSession {
         try? fileManager.createDirectory(at: prefix.appendingPathComponent("Cellar"), withIntermediateDirectories: true)
         let zshrc = home.appendingPathComponent(".zshrc")
         let stamp = home.appendingPathComponent(".pterm2-zshrc")
-        if (try? String(contentsOf: stamp, encoding: .utf8)) != "22" {
+        if (try? String(contentsOf: stamp, encoding: .utf8)) != "28" {
             let bundledP10k = Bundle.main.bundleURL.appendingPathComponent("Shell/omz/p10k.zsh")
             let installedP10k = home.appendingPathComponent(".p10k.zsh")
             if fileManager.fileExists(atPath: bundledP10k.path) {
@@ -318,7 +322,7 @@ final class ZshSession {
             export DISABLE_MAGIC_FUNCTIONS=true
             export ZSH_DISABLE_COMPFIX=true
             export GITSTATUS_AUTO_INSTALL=0
-            fpath=("$ZSH/zsh-functions" "$ZSH/functions" $fpath)
+            fpath=("$ZSH/functions" $fpath)
             plugins=(git bgnotify sudo history dotenv)
             source "$ZSH/oh-my-zsh.sh"
             unsetopt xtrace
@@ -364,7 +368,7 @@ final class ZshSession {
             fi
             """
             try? text.write(to: zshrc, atomically: true, encoding: .utf8)
-            try? Data("22".utf8).write(to: stamp)
+            try? Data("28".utf8).write(to: stamp)
         }
         return home
     }

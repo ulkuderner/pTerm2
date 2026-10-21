@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <pthread.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <unistd.h>
@@ -17,6 +18,24 @@ struct pterm_job {
 
 static pthread_mutex_t pterm_zsh_lock = PTHREAD_MUTEX_INITIALIZER;
 static int pterm_zsh_running = 0;
+static char pterm_home_rc[1024];
+
+const char *pterm_zshrc_path(void) {
+    return pterm_home_rc[0] ? pterm_home_rc : NULL;
+}
+
+void pterm_set_shell_home(const char *home) {
+    if (!home || !*home) {
+        return;
+    }
+    setenv("HOME", home, 1);
+    setenv("ZDOTDIR", home, 1);
+    snprintf(pterm_home_rc, sizeof(pterm_home_rc), "%s/.zshrc", home);
+    setenv("PTERM_ZSHRC", pterm_home_rc, 1);
+    char command_dir[1024];
+    snprintf(command_dir, sizeof(command_dir), "%s/Library/Caches/pterm-cmd", home);
+    setenv("PTERM_CMD_DIR", command_dir, 1);
+}
 
 static void *pterm_thread(void *raw) {
     struct pterm_job *job = raw;

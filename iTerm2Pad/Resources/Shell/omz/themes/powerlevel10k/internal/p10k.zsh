@@ -6616,6 +6616,9 @@ _p9k_save_status() {
 }
 
 function _p9k_dump_state() {
+  # The in-process iPad shell cannot honor `typeset >&$fd`. Dumping here
+  # paints the whole config on the terminal, so the prompt cache is skipped.
+  return 0
   local dir=${__p9k_dump_file:h}
   [[ -d $dir ]] || mkdir -p -- $dir || return
   [[ -w $dir ]] || return

@@ -139,7 +139,7 @@ final class ShellWorkspace {
                 return
             }
             let current = host.terminal.accessibilityLabel ?? ""
-            let combined = (current + text).suffix(4000)
+            let combined = (current + text).suffix(16000)
             host.terminal.accessibilityLabel = String(combined)
         }
         session.start()

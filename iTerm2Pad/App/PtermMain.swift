@@ -13,15 +13,11 @@ enum PtermMain {
             // iPad can drop the environment passed to the second process.
             // The container path is still available, so rebuild it here.
             let home = NSHomeDirectory()
-            setenv("HOME", home, 1)
-            setenv("ZDOTDIR", home, 1)
+            home.withCString { pterm_set_shell_home($0) }
             setenv("USER", "mobile", 1)
             setenv("LOGNAME", "mobile", 1)
             setenv("TERM", "xterm-256color", 1)
             setenv("LANG", "en_US.UTF-8", 1)
-            setenv("PTERM_ZSHRC", (home as NSString).appendingPathComponent(".zshrc"), 1)
-            setenv("PTERM_CMD_DIR", (home as NSString).appendingPathComponent("Library/Caches/pterm-cmd"), 1)
-            setenv("PTERM_LAUNCH_DIR", (home as NSString).appendingPathComponent("Library/Caches/pterm-launch"), 1)
             if getenv("PTERM_APP") == nil, let executable = Bundle.main.executablePath {
                 setenv("PTERM_APP", executable, 1)
             }
@@ -63,3 +59,6 @@ enum PtermExec {
 
 @_silgen_name("pterm_enter_zsh")
 func pterm_enter_zsh() -> Int32
+
+@_silgen_name("pterm_set_shell_home")
+func pterm_set_shell_home(_ home: UnsafePointer<CChar>)

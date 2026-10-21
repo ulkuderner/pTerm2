@@ -226,7 +226,9 @@ if ! _omz_compdump_has_metadata; then
   zcompdump_refresh=1
 fi
 
-if [[ "$ZSH_DISABLE_COMPFIX" != true ]]; then
+if [[ -n $PTERM_CMD_DIR || -n $PTERM_ZSHRC ]]; then
+  :
+elif [[ "$ZSH_DISABLE_COMPFIX" != true ]]; then
   source "$ZSH/lib/compfix.zsh"
   # Load only from secure directories
   # Reset the flag compinit sets when -i excludes insecure entries

@@ -108,16 +108,25 @@ final class PadFlowUITests: XCTestCase {
     }
 
     func testTypedShellCommands() throws {
+        try exerciseShell(extraArguments: ["-pterm-strip-env"])
+    }
+
+    func testInProcessShellCommands() throws {
+        try exerciseShell(extraArguments: ["-pterm-strip-env", "-pterm-inprocess"])
+    }
+
+    private func exerciseShell(extraArguments: [String]) throws {
         let app = XCUIApplication()
-        app.launchArguments += ["-pterm-shell", "-pterm-uitest", "-pterm-strip-env"]
+        app.launchArguments += ["-pterm-shell", "-pterm-uitest"] + extraArguments
         app.launch()
 
         let pane = app.descendants(matching: .any)["TerminalPane"]
         XCTAssertTrue(pane.waitForExistence(timeout: 20))
         XCTAssertTrue(waitUntil(timeout: 25) {
             let text = self.screenText(pane)
-            return text.contains("~") && !text.contains("localhost%")
-        }, "oh-my-zsh prompt missing: \(screenText(pane))")
+            return text.contains("~") && !text.contains("localhost%") && !text.contains("set-mark-command")
+        }, "shell startup did not finish: \(screenText(pane))")
+        RunLoop.current.run(until: Date().addingTimeInterval(2))
 
         pane.tap()
         typeCommand("ls", in: app)
