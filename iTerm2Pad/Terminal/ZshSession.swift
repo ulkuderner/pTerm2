@@ -263,19 +263,31 @@ final class ZshSession {
                                          withIntermediateDirectories: true)
         let zshrc = home.appendingPathComponent(".zshrc")
         let stamp = home.appendingPathComponent(".pterm2-zshrc")
-        if (try? String(contentsOf: stamp, encoding: .utf8)) != "11" {
+        if (try? String(contentsOf: stamp, encoding: .utf8)) != "17" {
+            let bundledP10k = Bundle.main.bundleURL.appendingPathComponent("Shell/omz/p10k.zsh")
+            let installedP10k = home.appendingPathComponent(".p10k.zsh")
+            if fileManager.fileExists(atPath: bundledP10k.path) {
+                try? fileManager.removeItem(at: installedP10k)
+                try? fileManager.copyItem(at: bundledP10k, to: installedP10k)
+            }
             let text = """
+            unsetopt xtrace verbose
+            setopt typeset_silent
             if [[ -n $ZDOTDIR ]]; then
               export HOME="$ZDOTDIR"
             fi
             export ZSH="$HOME/.oh-my-zsh"
-            export ZSH_THEME="robbyrussell"
+            export ZSH_THEME="powerlevel10k/powerlevel10k"
             export DISABLE_AUTO_UPDATE=true
             export DISABLE_UPDATE_PROMPT=true
             export DISABLE_MAGIC_FUNCTIONS=true
             export ZSH_DISABLE_COMPFIX=true
-            fpath=("$ZSH/functions" $fpath)
+            export GITSTATUS_AUTO_INSTALL=0
+            fpath=("$ZSH/zsh-functions" "$ZSH/functions" $fpath)
+            plugins=(git bgnotify sudo history dotenv)
             source "$ZSH/oh-my-zsh.sh"
+            unsetopt xtrace
+            [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
             cd "$HOME"
             unalias ls 2>/dev/null
             ls() {
@@ -321,10 +333,9 @@ final class ZshSession {
                 fi
               done
             }
-            PROMPT='%F{green}➜%f %F{cyan}%~%f %# '
             """
             try? text.write(to: zshrc, atomically: true, encoding: .utf8)
-            try? Data("11".utf8).write(to: stamp)
+            try? Data("17".utf8).write(to: stamp)
         }
         return home
     }
