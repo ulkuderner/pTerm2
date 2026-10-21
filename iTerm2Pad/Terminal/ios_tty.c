@@ -1,7 +1,9 @@
 #include <dlfcn.h>
 #include <pthread.h>
 #include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/uio.h>
@@ -292,29 +294,95 @@ int ioctl(int fd, unsigned long request, ...) {
 int tgetent(char *buffer, const char *name) {
     (void)buffer;
     (void)name;
-    return 0;
+    /* 1 means the description was found. 0 makes zsh mark the terminal bad,
+     * and Backspace then redraws the line to the right of the cursor. */
+    return 1;
 }
 
 int tgetnum(char *id) {
-    (void)id;
+    if (!id) {
+        return -1;
+    }
+    if (strcmp(id, "co") == 0) {
+        return window_size.ws_col > 0 ? window_size.ws_col : 80;
+    }
+    if (strcmp(id, "li") == 0) {
+        return window_size.ws_row > 0 ? window_size.ws_row : 40;
+    }
+    if (strcmp(id, "Co") == 0) {
+        return 256;
+    }
     return -1;
 }
 
 int tgetflag(char *id) {
-    (void)id;
-    return 0;
+    return id && strcmp(id, "am") == 0;
 }
 
 char *tgetstr(char *id, char **area) {
-    (void)id;
-    (void)area;
-    return 0;
+    const char *value = NULL;
+    if (!id) {
+        return NULL;
+    }
+    if (strcmp(id, "le") == 0 || strcmp(id, "bc") == 0) value = "\b";
+    else if (strcmp(id, "nd") == 0) value = "\033[C";
+    else if (strcmp(id, "up") == 0) value = "\033[A";
+    else if (strcmp(id, "do") == 0) value = "\n";
+    else if (strcmp(id, "cr") == 0) value = "\r";
+    else if (strcmp(id, "LE") == 0) value = "\033[%dD";
+    else if (strcmp(id, "RI") == 0) value = "\033[%dC";
+    else if (strcmp(id, "UP") == 0) value = "\033[%dA";
+    else if (strcmp(id, "DO") == 0) value = "\033[%dB";
+    else if (strcmp(id, "ce") == 0) value = "\033[K";
+    else if (strcmp(id, "cd") == 0) value = "\033[J";
+    else if (strcmp(id, "cl") == 0) value = "\033[H\033[2J";
+    else if (strcmp(id, "dc") == 0) value = "\033[P";
+    else if (strcmp(id, "DC") == 0) value = "\033[%dP";
+    else if (strcmp(id, "sc") == 0) value = "\0337";
+    else if (strcmp(id, "rc") == 0) value = "\0338";
+    else if (strcmp(id, "md") == 0) value = "\033[1m";
+    else if (strcmp(id, "so") == 0) value = "\033[7m";
+    else if (strcmp(id, "us") == 0) value = "\033[4m";
+    else if (strcmp(id, "me") == 0 || strcmp(id, "se") == 0 || strcmp(id, "ue") == 0) value = "\033[m";
+    else if (strcmp(id, "ta") == 0) value = "\t";
+    else if (strcmp(id, "ch") == 0) value = "\033[%dG";
+    if (!value) {
+        return NULL;
+    }
+    if (area && *area) {
+        char *dest = *area;
+        size_t length = strlen(value);
+        memcpy(dest, value, length + 1);
+        *area = dest + length + 1;
+        return dest;
+    }
+    return (char *)value;
 }
 
 char *tgoto(const char *cap, int column, int row) {
-    (void)column;
-    (void)row;
-    return (char *)cap;
+    static char expanded[64];
+    char *dest = expanded;
+    const char *cursor = cap ? cap : "";
+    int values[2] = {column, row};
+    int index = 0;
+    while (*cursor && dest < expanded + sizeof(expanded) - 8) {
+        if (cursor[0] == '%' && cursor[1] == 'd') {
+            int number = index < 2 ? values[index++] : 0;
+            dest += snprintf(dest, (size_t)(expanded + sizeof(expanded) - dest), "%d", number);
+            cursor += 2;
+        } else if (cursor[0] == '%' && cursor[1] == '%') {
+            *dest++ = '%';
+            cursor += 2;
+        } else if (cursor[0] == '%' && cursor[1] == 'i') {
+            values[0]++;
+            values[1]++;
+            cursor += 2;
+        } else {
+            *dest++ = *cursor++;
+        }
+    }
+    *dest = '\0';
+    return expanded;
 }
 
 int tputs(const char *text, int lines, int (*output)(int)) {

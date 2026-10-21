@@ -358,7 +358,7 @@ final class ZshSession {
         try? fileManager.createDirectory(at: prefix.appendingPathComponent("Cellar"), withIntermediateDirectories: true)
         let zshrc = profile.appendingPathComponent(".zshrc")
         let stamp = profile.appendingPathComponent(".pterm2-zshrc")
-        if (try? String(contentsOf: stamp, encoding: .utf8)) != "40" {
+        if (try? String(contentsOf: stamp, encoding: .utf8)) != "41" {
             let bundledP10k = Bundle.main.bundleURL.appendingPathComponent("Shell/omz/p10k.zsh")
             let installedP10k = profile.appendingPathComponent(".p10k.zsh")
             if fileManager.fileExists(atPath: bundledP10k.path) {
@@ -368,6 +368,13 @@ final class ZshSession {
             let text = """
             unsetopt xtrace verbose
             setopt typeset_silent
+            bindkey -e
+            bindkey '^?' backward-delete-char
+            bindkey '^H' backward-delete-char
+            PS1=$'%F{green}%~%f %# '
+            pterm_keep_prompt() { [[ $PS1 == *'%m%#'* ]] && PS1=$'%F{green}%~%f %# ' }
+            precmd_functions+=(pterm_keep_prompt)
+            cd "$HOME"
             export ZSH="${ZDOTDIR:-$HOME}/.oh-my-zsh"
             export ZSH_THEME="powerlevel10k/powerlevel10k"
             export DISABLE_AUTO_UPDATE=true
@@ -378,14 +385,19 @@ final class ZshSession {
             setopt extended_glob
             fpath=($ZSH/completions/Base/*(/N) $ZSH/completions/Zsh/*(/N) $ZSH/completions/Unix/Type(/N) $ZSH/completions $ZSH/functions $ZSH/zsh-functions $fpath)
             autoload -Uz compinit
-            compinit -u -d "${ZDOTDIR:-$HOME}/.zcompdump"
             plugins=(git bgnotify sudo history dotenv)
-            source "$ZSH/oh-my-zsh.sh"
+            pterm_load_theme() {
+              compinit -u -d "${ZDOTDIR:-$HOME}/.zcompdump" || true
+              source "$ZSH/oh-my-zsh.sh" || true
+              [[ ! -f ${ZDOTDIR:-$HOME}/.p10k.zsh ]] || source ${ZDOTDIR:-$HOME}/.p10k.zsh
+            }
+            pterm_load_theme
             unsetopt xtrace
+            bindkey -e
+            bindkey '^?' backward-delete-char
+            bindkey '^H' backward-delete-char
             bindkey '^I' expand-or-complete
             zstyle ':completion:*' menu select
-            [[ ! -f ${ZDOTDIR:-$HOME}/.p10k.zsh ]] || source ${ZDOTDIR:-$HOME}/.p10k.zsh
-            cd "$HOME"
             if [[ -n $PTERM_ROOT ]]; then
               cd() {
                 builtin cd "$@" || return
@@ -467,7 +479,7 @@ final class ZshSession {
             """
             do {
                 try text.write(to: zshrc, atomically: false, encoding: .utf8)
-                try Data("40".utf8).write(to: stamp)
+                try Data("41".utf8).write(to: stamp)
             } catch {
                 startupFault = "pterm: shell startup \(zshrc.path) (\(error.localizedDescription))\r\n"
             }
