@@ -181,6 +181,11 @@ target.build_configurations.each do |config|
     '-force_load', '$(SRCROOT)/iTerm2Pad/Resources/Shell/libzshell.a',
     '-liconv', '-lm'
   ]
+  settings['OTHER_LDFLAGS[sdk=iphonesimulator*]'] = [
+    '$(inherited)',
+    '-force_load', '$(SRCROOT)/iTerm2Pad/Resources/Shell/libzshell.sim.a',
+    '-liconv', '-lm'
+  ]
 end
 
 %w[ios_tty.c PtermZsh.c].each do |name|

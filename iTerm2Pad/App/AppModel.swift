@@ -49,6 +49,9 @@ final class AppModel {
 
     init(documents: URL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]) {
         self.documents = documents
+        if CommandLine.arguments.contains("-pterm-shell") {
+            tab = .shell
+        }
         reload()
     }
 

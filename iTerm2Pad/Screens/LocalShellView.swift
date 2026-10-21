@@ -119,6 +119,12 @@ final class ShellWorkspace {
         }
         session.onOutput = { [weak host] data in
             host?.terminal.feed(byteArray: ArraySlice(data))
+            guard let host, let text = String(data: data, encoding: .utf8) else {
+                return
+            }
+            let current = host.terminal.accessibilityLabel ?? ""
+            let combined = (current + text).suffix(4000)
+            host.terminal.accessibilityLabel = String(combined)
         }
         session.start()
     }
@@ -310,6 +316,8 @@ final class ShellCanvas: UIView {
     private var hosts: [UUID: PadTerminalHost] = [:]
     private var focusedPane: UUID?
     private var pendingFocus = false
+    private var splitFractions: [UUID: [CGFloat]] = [:]
+    private var dividers: [String: SplitDivider] = [:]
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -394,34 +402,107 @@ final class ShellCanvas: UIView {
                 bringSubviewToFront(chrome)
             }
         case .beside(let children):
-            layout(children, in: rect, stacked: false)
+            layout(children, in: rect, stacked: false, parent: node.id)
         case .stacked(let children):
-            layout(children, in: rect, stacked: true)
+            layout(children, in: rect, stacked: true, parent: node.id)
         }
     }
 
-    private func layout(_ children: [ShellWorkspace.Node], in rect: CGRect, stacked: Bool) {
+    private func layout(_ children: [ShellWorkspace.Node], in rect: CGRect, stacked: Bool, parent: UUID) {
         guard !children.isEmpty else {
             return
         }
+        var fractions = splitFractions[parent] ?? Array(repeating: 1, count: children.count)
+        if fractions.count != children.count {
+            fractions = Array(repeating: 1, count: children.count)
+            splitFractions[parent] = fractions
+        }
+        let total = max(fractions.reduce(0, +), 0.001)
         let gaps = CGFloat(children.count - 1) * Self.separatorGap
+        let span = max((stacked ? rect.height : rect.width) - gaps, 1)
         var origin = stacked ? rect.minY : rect.minX
-        let span = stacked ? rect.height : rect.width
-        let share = (span - gaps) / CGFloat(children.count)
+        var frames: [CGRect] = []
         for (index, child) in children.enumerated() {
-            let remaining = (stacked ? rect.maxY : rect.maxX) - origin
-            let length = index == children.count - 1 ? remaining : share
+            let length = index == children.count - 1
+                ? max((stacked ? rect.maxY : rect.maxX) - origin, 1)
+                : span * fractions[index] / total
             let piece = stacked
                 ? CGRect(x: rect.minX, y: origin, width: rect.width, height: length)
                 : CGRect(x: origin, y: rect.minY, width: length, height: rect.height)
+            frames.append(piece)
             layout(child, in: piece)
             origin += length + Self.separatorGap
         }
+        var live = Set<String>()
+        for index in 0..<(children.count - 1) {
+            let key = "\(parent.uuidString)-\(index)"
+            live.insert(key)
+            let divider = self.divider(key)
+            let gap = Self.separatorGap
+            divider.frame = stacked
+                ? CGRect(x: rect.minX, y: frames[index].maxY, width: rect.width, height: gap)
+                : CGRect(x: frames[index].maxX, y: rect.minY, width: gap, height: rect.height)
+            divider.stacked = stacked
+            divider.accessibilityIdentifier = "PaneDivider"
+            let capturedSpan = span
+            divider.onDrag = { [weak self] translation in
+                self?.resizeSplit(parent: parent, index: index, translation: translation, span: capturedSpan)
+            }
+            bringSubviewToFront(divider)
+        }
+        for (key, divider) in dividers where key.hasPrefix(parent.uuidString) && !live.contains(key) {
+            divider.removeFromSuperview()
+            dividers[key] = nil
+        }
+    }
+
+    private func resizeSplit(parent: UUID, index: Int, translation: CGFloat, span: CGFloat) {
+        guard var fractions = splitFractions[parent], index + 1 < fractions.count else {
+            return
+        }
+        if dragBasis[parent] == nil {
+            dragBasis[parent] = fractions
+        }
+        guard let basis = dragBasis[parent] else {
+            return
+        }
+        let total = basis.reduce(0, +)
+        let delta = translation / span * total
+        let minimum = total * 80 / max(span, 1)
+        var leading = basis[index] + delta
+        var trailing = basis[index + 1] - delta
+        if leading < minimum {
+            trailing -= minimum - leading
+            leading = minimum
+        }
+        if trailing < minimum {
+            leading -= minimum - trailing
+            trailing = minimum
+        }
+        fractions[index] = leading
+        fractions[index + 1] = trailing
+        splitFractions[parent] = fractions
+        setNeedsLayout()
+    }
+
+    private var dragBasis: [UUID: [CGFloat]] = [:]
+
+    private func divider(_ key: String) -> SplitDivider {
+        if let divider = dividers[key] {
+            return divider
+        }
+        let divider = SplitDivider(frame: .zero)
+        divider.onEnd = { [weak self] in
+            self?.dragBasis.removeAll()
+        }
+        dividers[key] = divider
+        addSubview(divider)
+        return divider
     }
 
     private var chromes: [UUID: PaneChrome] = [:]
 
-    private static let separatorGap: CGFloat = 3
+    private static let separatorGap: CGFloat = 11
 
     private func chrome(for pane: UUID) -> PaneChrome {
         if let chrome = chromes[pane] {
@@ -474,5 +555,68 @@ private final class PaneChrome: UIView {
         layer.borderWidth = marked ? (heavy ? 3 : 2) : 0
         layer.borderColor = UIColor.tintColor.cgColor
         layer.cornerRadius = marked ? 8 : 0
+    }
+}
+
+/// Visible grabber between panes. The track is the separator; the hit area is a 44 pt control.
+private final class SplitDivider: UIView {
+    var stacked = false {
+        didSet { setNeedsLayout() }
+    }
+    var onDrag: ((CGFloat) -> Void)?
+    var onEnd: (() -> Void)?
+    private let knob = UIView()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        isAccessibilityElement = true
+        accessibilityLabel = String(localized: "Pad.Split.Divider",
+                                    defaultValue: "Pane divider",
+                                    comment: "Accessibility name for the control that resizes split terminal panes")
+        accessibilityTraits = .adjustable
+        backgroundColor = .clear
+        knob.isUserInteractionEnabled = false
+        knob.backgroundColor = .tertiaryLabel
+        knob.layer.cornerCurve = .continuous
+        addSubview(knob)
+        addGestureRecognizer(UIPanGestureRecognizer(target: self, action: #selector(drag(_:))))
+    }
+
+    required init?(coder: NSCoder) {
+        it_fatalError("SplitDivider is built in code")
+    }
+
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        let hit = bounds.insetBy(dx: stacked ? 0 : -17, dy: stacked ? -17 : 0)
+        return hit.contains(point)
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let thick: CGFloat = traitCollection.accessibilityContrast == .high ? 6 : 4
+        if stacked {
+            knob.frame = CGRect(x: bounds.midX - 18, y: bounds.midY - thick / 2, width: 36, height: thick)
+        } else {
+            knob.frame = CGRect(x: bounds.midX - thick / 2, y: bounds.midY - 18, width: thick, height: 36)
+        }
+        knob.layer.cornerRadius = min(knob.bounds.width, knob.bounds.height) / 2
+    }
+
+    override func accessibilityIncrement() {
+        onDrag?(48)
+        onEnd?()
+    }
+
+    override func accessibilityDecrement() {
+        onDrag?(-48)
+        onEnd?()
+    }
+
+    @objc private func drag(_ gesture: UIPanGestureRecognizer) {
+        let translation = gesture.translation(in: superview)
+        onDrag?(stacked ? translation.y : translation.x)
+        if gesture.state == .ended || gesture.state == .cancelled || gesture.state == .failed {
+            onEnd?()
+        }
     }
 }

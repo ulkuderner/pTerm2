@@ -5,6 +5,74 @@ final class PadFlowUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    func testIPadSandboxShell() throws {
+        let app = XCUIApplication()
+        app.launchArguments.append("-pterm-shell")
+        app.launchArguments.append("-pterm-uitest")
+        app.launch()
+
+        let pane = app.descendants(matching: .any)["TerminalPane"]
+        XCTAssertTrue(pane.waitForExistence(timeout: 20))
+        let appeared = waitUntil(timeout: 25) {
+            let text = self.screenText(pane)
+            return text.contains("➜") && text.contains(".zshrc")
+        }
+        XCTAssertTrue(appeared, "sandbox shell did not list .zshrc: \(screenText(pane))")
+        XCTAssertFalse(screenText(pane).localizedCaseInsensitiveContains("could not start"))
+        XCTAssertFalse(screenText(pane).localizedCaseInsensitiveContains("sandbox shell"))
+        let listing = screenText(pane)
+        XCTAssertTrue(listing.contains("Application") || listing.contains("Containers"))
+        XCTAssertFalse(listing.localizedCaseInsensitiveContains("operation not permitted"))
+        XCTAssertFalse(listing.localizedCaseInsensitiveContains("permission denied"))
+        XCTAssertFalse(listing.localizedCaseInsensitiveContains("izin"))
+
+        app.typeKey("q", modifierFlags: .alternate)
+        XCTAssertTrue(waitUntil(timeout: 4) {
+            self.screenText(pane).contains("@")
+        }, "option-q did not insert @: \(screenText(pane))")
+
+        typeLine("echo COPYMARK", in: app)
+        XCTAssertTrue(waitUntil(timeout: 6) { self.screenText(pane).contains("COPYMARK") })
+        pane.press(forDuration: 1.2)
+        let copy = app.menuItems["Copy"].firstMatch
+        if copy.waitForExistence(timeout: 3) {
+            copy.tap()
+            app.typeKey("v", modifierFlags: .command)
+            XCTAssertTrue(waitUntil(timeout: 4) {
+                self.screenText(pane).components(separatedBy: "COPYMARK").count > 2
+            }, "paste did not echo the copy: \(screenText(pane))")
+        }
+
+        app.typeKey("d", modifierFlags: .command)
+        let divider = app.descendants(matching: .any)["PaneDivider"]
+        XCTAssertTrue(divider.waitForExistence(timeout: 5))
+        let before = divider.frame
+        let start = divider.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5))
+        start.press(forDuration: 0.2, thenDragTo: end)
+        let after = divider.frame
+        XCTAssertGreaterThan(abs(after.origin.x - before.origin.x), 2)
+    }
+
+    private func screenText(_ element: XCUIElement) -> String {
+        element.label
+    }
+
+    private func typeLine(_ text: String, in app: XCUIApplication) {
+        app.typeText(text + "\n")
+    }
+
+    private func waitUntil(timeout: TimeInterval, _ predicate: () -> Bool) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if predicate() {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+        }
+        return predicate()
+    }
+
     func testLocalShellAndTabs() throws {
         let app = XCUIApplication()
         app.launch()

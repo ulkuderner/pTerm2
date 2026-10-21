@@ -95,6 +95,11 @@ final class PadTerminalHost: UIView, TerminalViewDelegate {
         addSubview(terminal)
         backgroundColor = .black
         terminal.terminalDelegate = self
+        terminal.optionAsMetaKey = false
+        terminal.allowMouseReporting = false
+        isAccessibilityElement = false
+        terminal.isAccessibilityElement = true
+        terminal.accessibilityIdentifier = "TerminalPane"
         TerminalSplitShortcut.install()
         builtinAccessory = terminal.inputAccessoryView
         applyCurrentTheme()
@@ -116,6 +121,13 @@ final class PadTerminalHost: UIView, TerminalViewDelegate {
     }
 
     /// Takes the hardware keyboard back after another pane has left the window.
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        if CommandLine.arguments.contains("-pterm-uitest") {
+            terminal.getTerminal().setCursorStyle(.steadyBlock)
+        }
+    }
+
     func claimKeyboard() {
         guard window != nil, !terminal.isFirstResponder else {
             return
@@ -158,6 +170,8 @@ final class PadTerminalHost: UIView, TerminalViewDelegate {
     func applyCurrentTheme() {
         TerminalFont.apply(to: terminal)
         TerminalTheme.current.apply(to: terminal)
+        terminal.optionAsMetaKey = false
+        terminal.allowMouseReporting = false
     }
 
     func applyKeyboardBar() {
@@ -182,6 +196,14 @@ final class PadTerminalHost: UIView, TerminalViewDelegate {
                 } else {
                     onSplitVertical?()
                 }
+                return true
+            }
+            if flags.contains(.command), !flags.contains(.control), plain == "c" {
+                terminal.copy(nil)
+                return true
+            }
+            if flags.contains(.command), !flags.contains(.control), plain == "v" {
+                terminal.paste(nil)
                 return true
             }
             let isControlD = key.characters == "\u{4}" || (flags.contains(.control) && isD && !flags.contains(.command))

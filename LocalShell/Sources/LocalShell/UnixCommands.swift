@@ -33,18 +33,17 @@ struct LSCommand: ShellCommand {
         let all = arguments.contains("-a") || arguments.contains("-la") || arguments.contains("-al")
         let pathArg = arguments.last(where: { !$0.hasPrefix("-") })
         let url = pathArg.map { resolve($0, relativeTo: context) } ?? context.workingDirectory
-        let items = try FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey])
-        let names = items.map(\.lastPathComponent).sorted()
+        let names = (try FileManager.default.contentsOfDirectory(atPath: url.path)).sorted()
         for name in names {
             if name.hasPrefix(".") && !all {
                 continue
             }
             if long {
                 let child = url.appendingPathComponent(name)
-                let values = try child.resourceValues(forKeys: [.isDirectoryKey, .fileSizeKey])
-                let size = values.fileSize ?? 0
-                let mark = values.isDirectory == true ? "d" : "-"
-                context.stdout(String(format: "%@ %8d %@\n", mark, size, name))
+                var isDir: ObjCBool = false
+                FileManager.default.fileExists(atPath: child.path, isDirectory: &isDir)
+                let mark = isDir.boolValue ? "d" : "-"
+                context.stdout("\(mark) \(name)\n")
             } else {
                 context.stdout(name + "\n")
             }

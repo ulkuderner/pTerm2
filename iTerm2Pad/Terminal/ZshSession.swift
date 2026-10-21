@@ -2,6 +2,12 @@ import Darwin
 import Foundation
 import LocalShell
 
+@_silgen_name("pterm_start_zsh")
+private func pterm_start_zsh(_ fd: Int32, _ columns: Int32, _ rows: Int32) -> Int32
+
+@_silgen_name("pterm_set_winsize")
+private func pterm_set_winsize(_ fd: Int32, _ columns: Int32, _ rows: Int32)
+
 /// Interactive login zsh on a pseudoterminal. The prompt and command line are
 /// drawn by zsh itself, so the screen is a terminal rather than a text field.
 /// `launchProgram` replaces zsh with an agent CLI on the same pty.
@@ -44,93 +50,7 @@ final class ZshSession {
             return
         }
         started = true
-        #if !targetEnvironment(simulator)
         startBundledZsh(columns: columns, rows: rows)
-        return
-        #endif
-        let zshBinary = "/bin/zsh"
-        guard FileManager.default.isExecutableFile(atPath: zshBinary) else {
-            startBuiltin()
-            return
-        }
-        var masterFD: Int32 = -1
-        var slaveFD: Int32 = -1
-        var size = winsize(ws_row: rows, ws_col: columns, ws_xpixel: 0, ws_ypixel: 0)
-        guard openpty(&masterFD, &slaveFD, nil, nil, &size) == 0 else {
-            startBuiltin()
-            return
-        }
-        master = masterFD
-        writeFD = masterFD
-
-        var actions: posix_spawn_file_actions_t?
-        posix_spawn_file_actions_init(&actions)
-        posix_spawn_file_actions_adddup2(&actions, slaveFD, STDIN_FILENO)
-        posix_spawn_file_actions_adddup2(&actions, slaveFD, STDOUT_FILENO)
-        posix_spawn_file_actions_adddup2(&actions, slaveFD, STDERR_FILENO)
-        posix_spawn_file_actions_addclose(&actions, slaveFD)
-        posix_spawn_file_actions_addclose(&actions, masterFD)
-
-        var attr: posix_spawnattr_t?
-        posix_spawnattr_init(&attr)
-        posix_spawnattr_setflags(&attr, Int16(POSIX_SPAWN_SETSID))
-
-        let environment = Self.environment()
-        let program: String
-        let arguments: [String]
-        if let launchProgram, FileManager.default.isExecutableFile(atPath: launchProgram) {
-            let script = "cd '\(Self.accountHome)' && exec '\(launchProgram)'"
-            program = "/bin/zsh"
-            arguments = ["/bin/zsh", "-i", "-l", "-c", script]
-        } else {
-            if let missingNotice {
-                emit(missingNotice + "\r\n")
-            }
-            program = "/bin/zsh"
-            arguments = ["/bin/zsh", "-i", "-l"]
-        }
-        var argv: [UnsafeMutablePointer<CChar>?] = arguments.map { strdup($0) }
-        argv.append(nil)
-        var env: [UnsafeMutablePointer<CChar>?] = environment.map { strdup($0) }
-        env.append(nil)
-        defer {
-            argv.forEach { free($0) }
-            env.forEach { free($0) }
-            posix_spawn_file_actions_destroy(&actions)
-            posix_spawnattr_destroy(&attr)
-        }
-
-        var pid: pid_t = 0
-        let result = argv.withUnsafeMutableBufferPointer { argvBuf in
-            env.withUnsafeMutableBufferPointer { envBuf in
-                posix_spawn(&pid, program, &actions, &attr, argvBuf.baseAddress, envBuf.baseAddress)
-            }
-        }
-        close(slaveFD)
-        guard result == 0 else {
-            close(masterFD)
-            master = -1
-            startBuiltin()
-            return
-        }
-        child = pid
-        let process = DispatchSource.makeProcessSource(identifier: pid, eventMask: .exit, queue: .main)
-        process.setEventHandler { [weak self] in
-            self?.noteExit()
-        }
-        watch = process
-        process.resume()
-        let source = DispatchSource.makeReadSource(fileDescriptor: masterFD, queue: .global(qos: .userInteractive))
-        source.setEventHandler { [weak self] in
-            self?.readAvailable()
-        }
-        source.setCancelHandler {
-            if masterFD >= 0 {
-                close(masterFD)
-            }
-        }
-        reader = source
-        source.resume()
     }
 
     func send(_ data: Data) {
@@ -154,6 +74,7 @@ final class ZshSession {
         guard master >= 0 else {
             return
         }
+        pterm_set_winsize(Int32(master), Int32(columns), Int32(rows))
         var size = winsize(ws_row: UInt16(rows), ws_col: UInt16(columns), ws_xpixel: 0, ws_ypixel: 0)
         ioctl(master, TIOCSWINSZ, &size)
     }
@@ -212,89 +133,45 @@ final class ZshSession {
     /// openpty is not used.
     private func startBundledZsh(columns: UInt16, rows: UInt16) {
         let home = prepareSandboxHome()
-        guard let binary = Bundle.main.executableURL else {
+        setenv("HOME", home.path, 1)
+        setenv("ZDOTDIR", home.path, 1)
+        setenv("USER", "mobile", 1)
+        setenv("LOGNAME", "mobile", 1)
+        setenv("TERM", "xterm-256color", 1)
+        setenv("COLORTERM", "truecolor", 1)
+        setenv("LANG", "en_US.UTF-8", 1)
+        setenv("COLUMNS", "\(columns)", 1)
+        setenv("LINES", "\(rows)", 1)
+        if CommandLine.arguments.contains("-pterm-uitest") {
+            setenv("PTERM_UTEST", "1", 1)
+            try? Data("1".utf8).write(to: home.appendingPathComponent(".pterm-utest"))
+        }
+
+        var pair = [Int32](repeating: 0, count: 2)
+        guard socketpair(AF_UNIX, SOCK_STREAM, 0, &pair) == 0 else {
             startBuiltin()
             return
         }
-
-        var inputPipe: [Int32] = [0, 0]
-        var outputPipe: [Int32] = [0, 0]
-        guard pipe(&inputPipe) == 0, pipe(&outputPipe) == 0 else {
-            startBuiltin()
-            return
-        }
-
-        var actions: posix_spawn_file_actions_t?
-        posix_spawn_file_actions_init(&actions)
-        posix_spawn_file_actions_adddup2(&actions, inputPipe[0], STDIN_FILENO)
-        posix_spawn_file_actions_adddup2(&actions, outputPipe[1], STDOUT_FILENO)
-        posix_spawn_file_actions_adddup2(&actions, outputPipe[1], STDERR_FILENO)
-        posix_spawn_file_actions_addclose(&actions, inputPipe[1])
-        posix_spawn_file_actions_addclose(&actions, outputPipe[0])
-
-        var attr: posix_spawnattr_t?
-        posix_spawnattr_init(&attr)
-        defer {
-            posix_spawn_file_actions_destroy(&actions)
-            posix_spawnattr_destroy(&attr)
-        }
-
-        let environment = [
-            "HOME=\(home.path)",
-            "ZDOTDIR=\(home.path)",
-            "USER=mobile",
-            "LOGNAME=mobile",
-            "SHELL=\(binary.path)",
-            "TERM=xterm-256color",
-            "COLORTERM=truecolor",
-            "LANG=en_US.UTF-8",
-            "LC_ALL=en_US.UTF-8",
-            "COLUMNS=\(columns)",
-            "LINES=\(rows)",
-            "PATH=/usr/bin:/bin"
-        ]
-        let arguments = [binary.path, "--pterm-zsh"]
-        var argv: [UnsafeMutablePointer<CChar>?] = arguments.map { strdup($0) }
-        argv.append(nil)
-        var env: [UnsafeMutablePointer<CChar>?] = environment.map { strdup($0) }
-        env.append(nil)
-        defer {
-            argv.forEach { free($0) }
-            env.forEach { free($0) }
-        }
-
-        var pid: pid_t = 0
-        let result = argv.withUnsafeMutableBufferPointer { argvBuf in
-            env.withUnsafeMutableBufferPointer { envBuf in
-                posix_spawn(&pid, binary.path, &actions, &attr, argvBuf.baseAddress, envBuf.baseAddress)
-            }
-        }
-        close(inputPipe[0])
-        close(outputPipe[1])
+        var noSignal: Int32 = 1
+        setsockopt(pair[0], SOL_SOCKET, SO_NOSIGPIPE, &noSignal, socklen_t(MemoryLayout<Int32>.size))
+        let result = pterm_start_zsh(pair[1], Int32(columns), Int32(rows))
         guard result == 0 else {
-            close(inputPipe[1])
-            close(outputPipe[0])
+            close(pair[0])
+            close(pair[1])
             emit("zsh: could not start in the sandbox (\(result))\r\n")
             startBuiltin()
             return
         }
-
-        child = pid
-        master = outputPipe[0]
-        writeFD = inputPipe[1]
+        master = pair[0]
+        writeFD = pair[0]
         translateNewlines = true
-        let process = DispatchSource.makeProcessSource(identifier: pid, eventMask: .exit, queue: .main)
-        process.setEventHandler { [weak self] in
-            self?.noteExit()
-        }
-        watch = process
-        process.resume()
-        let source = DispatchSource.makeReadSource(fileDescriptor: outputPipe[0], queue: .global(qos: .userInteractive))
+        let owned = pair[0]
+        let source = DispatchSource.makeReadSource(fileDescriptor: owned, queue: .global(qos: .userInteractive))
         source.setEventHandler { [weak self] in
             self?.readAvailable()
         }
         source.setCancelHandler {
-            close(outputPipe[0])
+            close(owned)
         }
         reader = source
         source.resume()
@@ -306,7 +183,9 @@ final class ZshSession {
         let omz = home.appendingPathComponent(".oh-my-zsh", isDirectory: true)
         let marker = omz.appendingPathComponent("pterm2-omz-version")
         let bundled = Bundle.main.bundleURL.appendingPathComponent("Shell/omz", isDirectory: true)
-        if !fileManager.fileExists(atPath: marker.path),
+        let wanted = (try? String(contentsOf: bundled.appendingPathComponent("pterm2-omz-version"), encoding: .utf8)) ?? "3"
+        let installed = (try? String(contentsOf: marker, encoding: .utf8)) ?? ""
+        if installed != wanted,
            fileManager.fileExists(atPath: bundled.appendingPathComponent("oh-my-zsh.sh").path) {
             try? fileManager.removeItem(at: omz)
             try? fileManager.copyItem(at: bundled, to: omz)
@@ -316,18 +195,69 @@ final class ZshSession {
         try? fileManager.createDirectory(at: omz.appendingPathComponent("cache", isDirectory: true),
                                          withIntermediateDirectories: true)
         let zshrc = home.appendingPathComponent(".zshrc")
-        if !fileManager.fileExists(atPath: zshrc.path) {
+        let stamp = home.appendingPathComponent(".pterm2-zshrc")
+        if (try? String(contentsOf: stamp, encoding: .utf8)) != "11" {
             let text = """
+            if [[ -n $ZDOTDIR ]]; then
+              export HOME="$ZDOTDIR"
+            fi
             export ZSH="$HOME/.oh-my-zsh"
             export ZSH_THEME="robbyrussell"
             export DISABLE_AUTO_UPDATE=true
             export DISABLE_UPDATE_PROMPT=true
             export DISABLE_MAGIC_FUNCTIONS=true
+            export ZSH_DISABLE_COMPFIX=true
             fpath=("$ZSH/functions" $fpath)
             source "$ZSH/oh-my-zsh.sh"
             cd "$HOME"
+            unalias ls 2>/dev/null
+            ls() {
+              emulate -L zsh
+              setopt localoptions nullglob
+              local show_all=0 long=0
+              local -a targets
+              local arg
+              for arg in "$@"; do
+                if [[ $arg == -* ]]; then
+                  [[ $arg == *a* ]] && show_all=1
+                  [[ $arg == *l* ]] && long=1
+                else
+                  targets+=("$arg")
+                fi
+              done
+              (( ${#targets} )) || targets=(".")
+              local target name kind
+              for target in "${targets[@]}"; do
+                if [[ ! -e $target ]]; then
+                  print -r -- "ls: $target: No such file or directory"
+                  continue
+                fi
+                if [[ -d $target ]]; then
+                  local -a names
+                  if (( show_all )); then
+                    names=("$target"/.*(N) "$target"/*(N))
+                  else
+                    names=("$target"/*(N))
+                  fi
+                  for name in "${names[@]}"; do
+                    kind="-"
+                    [[ -d $name ]] && kind="d"
+                    [[ -L $name ]] && kind="l"
+                    if (( long )); then
+                      print -r -- "$kind ${name:t}"
+                    else
+                      print -r -- "${name:t}"
+                    fi
+                  done
+                else
+                  print -r -- "$target"
+                fi
+              done
+            }
+            PROMPT='%F{green}➜%f %F{cyan}%~%f %# '
             """
             try? text.write(to: zshrc, atomically: true, encoding: .utf8)
+            try? Data("11".utf8).write(to: stamp)
         }
         return home
     }

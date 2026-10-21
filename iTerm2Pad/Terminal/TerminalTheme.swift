@@ -184,7 +184,7 @@ struct TerminalTheme: Identifiable, Equatable, CaseIterable {
         view.nativeBackgroundColor = background
         view.backgroundColor = background
         view.caretColor = cursor
-        view.allowMouseReporting = true
+        view.allowMouseReporting = false
     }
 
     private static func c(_ red: Int, _ green: Int, _ blue: Int) -> Color {
