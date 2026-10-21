@@ -44,6 +44,8 @@ final class ZshSession {
     private var replyFD: Int32 = -1
     private var startupFault: String?
     private var spawnStatus: Int32 = -1
+    var launchClaude = false
+    private var claudeBusy = false
 
     static var accountHome: String {
         if let users = try? FileManager.default.contentsOfDirectory(atPath: "/Users") {
@@ -369,7 +371,7 @@ final class ZshSession {
         try? fileManager.createDirectory(at: prefix.appendingPathComponent("Cellar"), withIntermediateDirectories: true)
         let zshrc = profile.appendingPathComponent(".zshrc")
         let stamp = profile.appendingPathComponent(".pterm2-zshrc")
-        if (try? String(contentsOf: stamp, encoding: .utf8)) != "41" {
+        if (try? String(contentsOf: stamp, encoding: .utf8)) != "42" {
             let bundledP10k = Bundle.main.bundleURL.appendingPathComponent("Shell/omz/p10k.zsh")
             let installedP10k = profile.appendingPathComponent(".p10k.zsh")
             if fileManager.fileExists(atPath: bundledP10k.path) {
@@ -471,7 +473,7 @@ final class ZshSession {
               fi
               return $code
             }
-            for pterm_cmd in ls cat mkdir touch rm cp mv grep egrep fgrep head wc ssh mosh scp git sshfs umount python3 python pip3 pip brew; do
+            for pterm_cmd in ls cat mkdir touch rm cp mv grep egrep fgrep head wc ssh mosh scp git sshfs umount python3 python pip3 pip brew claude; do
               unalias "$pterm_cmd" 2>/dev/null
               eval "$pterm_cmd() { pterm_arm $pterm_cmd \\"\\$@\\"; }"
             done
@@ -490,7 +492,7 @@ final class ZshSession {
             """
             do {
                 try text.write(to: zshrc, atomically: false, encoding: .utf8)
-                try Data("41".utf8).write(to: stamp)
+                try Data("42".utf8).write(to: stamp)
             } catch {
                 startupFault = "pterm: shell startup \(zshrc.path) (\(error.localizedDescription))\r\n"
             }
@@ -615,9 +617,28 @@ final class ZshSession {
         }
         writeTerminal(shell.prompt())
         if CommandLine.arguments.contains("-pterm-selftest") {
-            for command in ["ls", "brew", "git status"] {
+            send(Data("ech".utf8))
+            send(Data([0x09]))
+            send(Data("Doc".utf8))
+            send(Data([0x09]))
+            send(Data([0x15]))
+            for command in ["ls", "brew", "python3 -c \"print(6*7)\"", "python3 -c \"import hashlib; print(hashlib.sha256(b'a').hexdigest()[:8])\"", "python3 -m pip --version", "claude --version", "claude -p \"Reply with the single word pong\""] {
                 writeTerminal("\(command)\r\n")
                 _ = shell.run(command)
+            }
+            writeTerminal(shell.beginClaude())
+            if shell.claudeActive {
+                let reply = shell.claudeTurn("Use the bash tool to run ls. Then reply with exactly pong.") { event in
+                    self.writeTerminal(event)
+                }
+                writeTerminal(reply.hasSuffix("\n") ? reply : reply + "\n")
+                shell.endClaude()
+            }
+        }
+        if launchClaude, !shell.claudeActive {
+            writeTerminal(shell.beginClaude())
+            if shell.claudeActive {
+                writeTerminal("claude> ")
             }
         }
     }
@@ -643,7 +664,45 @@ final class ZshSession {
                 line = ""
                 let trimmed = command.trimmingCharacters(in: .whitespaces)
                 if trimmed == "exit" || trimmed == "logout" {
+                    if builtin?.claudeActive == true {
+                        builtin?.endClaude()
+                        writeTerminal(builtin?.prompt() ?? "")
+                        return
+                    }
                     onExit?()
+                    return
+                }
+                if builtin?.claudeActive == true {
+                    if trimmed.isEmpty {
+                        writeTerminal("claude> ")
+                        return
+                    }
+                    if claudeBusy {
+                        writeTerminal("claude is still working\r\nclaude> ")
+                        return
+                    }
+                    claudeBusy = true
+                    let prompt = trimmed
+                    DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                        let reply = self?.builtin?.claudeTurn(prompt) { event in
+                            self?.writeTerminal(event)
+                        } ?? ""
+                        DispatchQueue.main.async {
+                            self?.claudeBusy = false
+                            self?.writeTerminal(reply.hasSuffix("\n") ? reply : reply + "\n")
+                            self?.writeTerminal("claude> ")
+                        }
+                    }
+                    return
+                }
+                if trimmed == "claude" {
+                    let banner = builtin?.beginClaude() ?? ""
+                    writeTerminal(banner)
+                    if builtin?.claudeActive == true {
+                        writeTerminal("claude> ")
+                    } else {
+                        writeTerminal(builtin?.prompt() ?? "")
+                    }
                     return
                 }
                 _ = builtin?.run(command)
@@ -651,6 +710,8 @@ final class ZshSession {
                     NotificationCenter.default.post(name: .ptermSSHLaunch, object: nil)
                 }
                 writeTerminal(builtin?.prompt() ?? "")
+            case 0x09:
+                completeBuiltin()
             case 0x7f, 0x08:
                 guard !line.isEmpty else { continue }
                 line.removeLast()
@@ -658,7 +719,11 @@ final class ZshSession {
             case 0x03:
                 line = ""
                 writeTerminal("^C\r\n")
-                writeTerminal(builtin?.prompt() ?? "")
+                if builtin?.claudeActive == true {
+                    writeTerminal("claude> ")
+                } else {
+                    writeTerminal(builtin?.prompt() ?? "")
+                }
             case 0x15:
                 line = ""
                 writeTerminal("\r\n")
@@ -684,6 +749,26 @@ final class ZshSession {
             historyCursor += 1
         }
         replaceLine(historyCursor < history.count ? history[historyCursor] : "")
+    }
+
+    private func completeBuiltin() {
+        guard let shell = builtin else {
+            return
+        }
+        let outcome = shell.complete(line: line)
+        if outcome.line != line {
+            replaceLine(outcome.line)
+        }
+        guard !outcome.matches.isEmpty else {
+            return
+        }
+        writeTerminal("\r\n" + outcome.matches.joined(separator: "  ") + "\r\n")
+        if shell.claudeActive {
+            writeTerminal("claude> ")
+        } else {
+            writeTerminal(shell.prompt())
+        }
+        writeTerminal(line)
     }
 
     private func replaceLine(_ next: String) {

@@ -8,7 +8,7 @@ struct PythonCommand: ShellCommand {
 
     func run(arguments: [String], context: inout CommandContext) throws -> Int32 {
         if pad_python3_ready() != 0 {
-            return invoke(arguments: arguments)
+            return invoke(arguments: arguments, context: &context)
         }
         if arguments.contains("-c"), let index = arguments.firstIndex(of: "-c"), arguments.indices.contains(index + 1) {
             return try runInline(arguments[index + 1], context: &context)
@@ -25,15 +25,29 @@ struct PythonCommand: ShellCommand {
         return 0
     }
 
-    private func invoke(arguments: [String]) -> Int32 {
+    private func invoke(arguments: [String], context: inout CommandContext) -> Int32 {
         let argv = ["python3"] + arguments
         let cStrings = argv.map { strdup($0)! }
         defer { cStrings.forEach { free($0) } }
         var pointers: [UnsafePointer<CChar>?] = cStrings.map { UnsafePointer($0) }
         pointers.append(nil)
-        return pointers.withUnsafeBufferPointer { buffer in
+        let capture = FileManager.default.temporaryDirectory
+            .appendingPathComponent("pterm-python-\(UUID().uuidString).log")
+        FileManager.default.createFile(atPath: capture.path, contents: nil)
+        setenv("PTERM_PY_CAPTURE", capture.path, 1)
+        setenv("HOME", context.home.path, 1)
+        let previous = FileManager.default.currentDirectoryPath
+        _ = FileManager.default.changeCurrentDirectoryPath(context.workingDirectory.path)
+        let code = pointers.withUnsafeBufferPointer { buffer in
             pad_python3_main(Int32(argv.count), buffer.baseAddress)
         }
+        _ = FileManager.default.changeCurrentDirectoryPath(previous)
+        unsetenv("PTERM_PY_CAPTURE")
+        if let text = try? String(contentsOf: capture, encoding: .utf8), !text.isEmpty {
+            context.stdout(text)
+        }
+        try? FileManager.default.removeItem(at: capture)
+        return code
     }
 
     private func runInline(_ source: String, context: inout CommandContext) throws -> Int32 {

@@ -147,6 +147,13 @@ install_shell.shell_script = <<~'SCRIPT'
   cp -R "$SRC" "$DEST"
 SCRIPT
 
+install_python = target.new_shell_script_build_phase('Install CPython stdlib')
+install_python.shell_script = <<~'SCRIPT'
+  set -eu
+  source "$SRCROOT/LocalShell/Frameworks/Python.xcframework/build/utils.sh"
+  install_python LocalShell/Frameworks/Python.xcframework
+SCRIPT
+
 target.add_dependency(provider_target)
 embed_phase = target.new_copy_files_build_phase('Embed Foundation Extensions')
 embed_phase.symbol_dst_subfolder_spec = :plug_ins

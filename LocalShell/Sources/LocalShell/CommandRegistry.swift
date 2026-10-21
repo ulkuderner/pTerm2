@@ -120,7 +120,7 @@ public final class CommandRegistry: @unchecked Sendable {
     }
 
     private func listCommands(context: CommandContext) {
-        let extras = ["git", "scp", "ssh", "sshfs", "umount", "python3", "pip3", "mosh", "brew"]
+        let extras = ["git", "scp", "ssh", "sshfs", "umount", "python3", "pip3", "mosh", "brew", "claude"]
         let names = (Self.blinkCommands + extras + ["help"]).sorted()
         context.stdout(names.joined(separator: "  ") + "\n")
     }
@@ -152,6 +152,7 @@ public final class CommandRegistry: @unchecked Sendable {
         register(PythonCommand())
         register(PipCommand())
         register(BrewCommand())
+        register(ClaudeCommand())
     }
 
     private func tokenize(_ line: String) -> [String] {

@@ -66,16 +66,24 @@ enum TerminalFont {
 final class FocusTerminalView: TerminalView {
     var onFocus: (() -> Void)?
     var onSubmit: (() -> Void)?
+    var onTab: (() -> Void)?
 
     override var keyCommands: [UIKeyCommand]? {
         var commands = super.keyCommands ?? []
         commands.append(UIKeyCommand(input: "\r", modifierFlags: [], action: #selector(padSubmitLine)))
         commands.append(UIKeyCommand(input: "\n", modifierFlags: [], action: #selector(padSubmitLine)))
+        let tab = UIKeyCommand(input: "\t", modifierFlags: [], action: #selector(padInsertTab))
+        tab.wantsPriorityOverSystemBehavior = true
+        commands.append(tab)
         return commands
     }
 
     @objc func padSubmitLine() {
         onSubmit?()
+    }
+
+    @objc func padInsertTab() {
+        onTab?()
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -114,6 +122,9 @@ final class PadTerminalHost: UIView, TerminalViewDelegate {
         terminal.accessibilityIdentifier = "TerminalPane"
         terminal.onSubmit = { [weak self] in
             self?.submitLine()
+        }
+        terminal.onTab = { [weak self] in
+            self?.insertTab()
         }
         TerminalSplitShortcut.install()
         builtinAccessory = terminal.inputAccessoryView
@@ -198,6 +209,7 @@ final class PadTerminalHost: UIView, TerminalViewDelegate {
     }
 
     private var lastSubmit = Date.distantPast
+    private var lastTab = Date.distantPast
 
     private func submitLine() {
         let now = Date()
@@ -206,6 +218,15 @@ final class PadTerminalHost: UIView, TerminalViewDelegate {
         }
         lastSubmit = now
         onBytes?(Data("\r".utf8))
+    }
+
+    private func insertTab() {
+        let now = Date()
+        if now.timeIntervalSince(lastTab) < 0.05 {
+            return
+        }
+        lastTab = now
+        onBytes?(Data([0x09]))
     }
 
     func handleKey(_ presses: Set<UIPress>) -> Bool {
@@ -234,6 +255,10 @@ final class PadTerminalHost: UIView, TerminalViewDelegate {
             }
             if key.keyCode == .keyboardReturn || key.characters == "\r" || key.characters == "\n" {
                 submitLine()
+                return true
+            }
+            if key.keyCode == .keyboardTab, !flags.contains(.command) {
+                insertTab()
                 return true
             }
             let isControlD = key.characters == "\u{4}" || (flags.contains(.control) && isD && !flags.contains(.command))

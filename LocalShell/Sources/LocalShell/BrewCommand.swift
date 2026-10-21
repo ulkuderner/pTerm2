@@ -8,7 +8,7 @@ struct BrewCommand: ShellCommand {
 
     static let builtIn = [
         "ls", "cat", "mkdir", "touch", "rm", "cp", "mv", "grep", "head", "wc",
-        "whoami", "uname", "date", "ssh", "scp", "git", "sshfs", "python3", "pip3"
+        "whoami", "uname", "date", "ssh", "scp", "git", "sshfs", "python3", "pip3", "claude"
     ]
 
     func run(arguments: [String], context: inout CommandContext) throws -> Int32 {

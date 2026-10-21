@@ -7,13 +7,15 @@ struct AgentTool: Identifiable, Equatable {
     let detail: String
     let binaries: [String]
     let symbol: String
+    var builtin = false
 
     static let claude = AgentTool(
         id: "claude",
         title: "Claude",
         detail: "Claude Code",
         binaries: ["claude"],
-        symbol: "sparkles"
+        symbol: "sparkles",
+        builtin: true
     )
 
     static let openai = AgentTool(

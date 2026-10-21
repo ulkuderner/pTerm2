@@ -52,9 +52,10 @@ final class ShellWorkspace {
     }
 
     /// Command-D puts the new shell to the right. Command-Shift-D puts it below.
-    func split(_ pane: UUID, beside: Bool, program: String? = nil, missingNotice: String? = nil) {
+    func split(_ pane: UUID, beside: Bool, program: String? = nil, missingNotice: String? = nil, claude: Bool = false) {
         let added = UUID()
         let session = ZshSession()
+        session.launchClaude = claude
         session.launchProgram = program
         session.missingNotice = missingNotice
         session.onExit = { [weak self] in
@@ -76,6 +77,10 @@ final class ShellWorkspace {
     }
 
     func open(_ agent: AgentTool) {
+        if agent.builtin {
+            split(focused, beside: true, claude: true)
+            return
+        }
         split(focused, beside: true, program: agent.executable(), missingNotice: agent.missingNotice())
     }
 

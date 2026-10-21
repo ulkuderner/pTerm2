@@ -431,6 +431,7 @@
 				06411C94ACA19558E0B035D3 /* Frameworks */,
 				8ACEB66F36830FC40E50AF2E /* Resources */,
 				0835B8329DC95E41C532C39D /* Install sandbox zsh */,
+				B7E4A1C09D2F48A6B3C15E70 /* Install CPython stdlib */,
 				23EF017E55C0748E4E1F46F1 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
@@ -545,6 +546,24 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "set -eu\nSRC=\"$SRCROOT/iTerm2Pad/Resources/Shell/omz\"\nDEST=\"$BUILT_PRODUCTS_DIR/$PRODUCT_NAME.app/Shell/omz\"\nrm -rf \"$DEST\"\nmkdir -p \"$(dirname \"$DEST\")\"\ncp -R \"$SRC\" \"$DEST\"\n";
+		};
+		B7E4A1C09D2F48A6B3C15E70 /* Install CPython stdlib */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Install CPython stdlib";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\nsource \"$SRCROOT/LocalShell/Frameworks/Python.xcframework/build/utils.sh\"\ninstall_python LocalShell/Frameworks/Python.xcframework\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

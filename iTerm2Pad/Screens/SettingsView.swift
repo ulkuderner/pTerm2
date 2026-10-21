@@ -26,7 +26,7 @@ struct SettingsView: View {
                                comment: "Settings section heading for coding-agent CLIs")) {
                     ForEach(AgentTool.all) { agent in
                         LabeledContent(agent.title) {
-                            Text(agent.executable() == nil
+                            Text(agent.builtin || agent.executable() != nil
                                  ? String(localized: "Pad.Agent.Absent",
                                           defaultValue: "Not installed",
                                           comment: "Shown when an agent CLI is not on the shell path")

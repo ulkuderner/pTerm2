@@ -27,6 +27,14 @@ enum ShellRoot {
 @main
 enum PtermMain {
     static func main() {
+        if CommandLine.arguments.contains("--pterm-keychain-check") {
+            let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+            let ready = ClaudeKeychain.importFile(at: home) && ClaudeKeychain.load() != nil
+            let message = ready ? "keychain-ok\n" : "keychain-missing \(ClaudeKeychain.lastStatus)\n"
+            try? message.write(to: home.appendingPathComponent("pterm-keychain.txt"), atomically: true, encoding: .utf8)
+            fputs(message, stdout)
+            exit(ready ? 0 : 1)
+        }
         if CommandLine.arguments.contains("--pterm-exec") {
             exit(PtermExec.run())
         }
