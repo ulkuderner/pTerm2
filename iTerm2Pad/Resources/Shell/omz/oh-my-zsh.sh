@@ -38,12 +38,8 @@ omz_f() {
   return 1
 }
 
-# Check if in emulation mode, if so early return
-# https://github.com/ohmyzsh/ohmyzsh/issues/11686
-[[ "$(emulate)" = zsh ]] || {
-  printf "$(omz_f 1 31)Error:$(omz_f 22) Oh My Zsh can't be loaded in \`$(emulate)\` emulation mode.$(omz_f 0)\n" >&2
-  return 1
-}
+# Stay in zsh emulation without starting another process.
+emulate zsh
 
 unset -f omz_f
 

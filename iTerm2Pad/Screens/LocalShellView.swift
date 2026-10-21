@@ -19,6 +19,7 @@ final class ShellWorkspace {
     var focused: UUID
     private var sessions: [UUID: ZshSession] = [:]
     private var hosts: [UUID: PadTerminalHost] = [:]
+    private var lastFreshShell = Date.distantPast
 
     init() {
         let pane = UUID()
@@ -96,6 +97,10 @@ final class ShellWorkspace {
             }
             return
         }
+        if Date().timeIntervalSince(lastFreshShell) < 1 {
+            return
+        }
+        lastFreshShell = Date()
         let fresh = UUID()
         let replacement = ZshSession()
         focused = fresh
@@ -247,6 +252,13 @@ struct LocalShellView: View {
                                         comment: "Navigation title of the local shell"))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbarBackground(Color.black, for: .navigationBar)
+                .onAppear {
+                    if CommandLine.arguments.contains("-pterm-split") {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                            workspace.splitFocused(beside: true)
+                        }
+                    }
+                }
                 .toolbarColorScheme(.dark, for: .navigationBar)
                 .toolbar {
                     ToolbarItemGroup(placement: .topBarTrailing) {

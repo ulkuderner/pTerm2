@@ -142,6 +142,8 @@ final class ZshSession {
         setenv("LANG", "en_US.UTF-8", 1)
         setenv("COLUMNS", "\(columns)", 1)
         setenv("LINES", "\(rows)", 1)
+        setenv("PTERM_ZSHRC", home.appendingPathComponent(".zshrc").path, 1)
+        setenv("PATH", "/usr/bin:/bin:/usr/sbin:/sbin", 1)
         if CommandLine.arguments.contains("-pterm-uitest") {
             setenv("PTERM_UTEST", "1", 1)
             try? Data("1".utf8).write(to: home.appendingPathComponent(".pterm-utest"))
@@ -154,6 +156,12 @@ final class ZshSession {
         }
         var noSignal: Int32 = 1
         setsockopt(pair[0], SOL_SOCKET, SO_NOSIGPIPE, &noSignal, socklen_t(MemoryLayout<Int32>.size))
+        if let executable = Bundle.main.executableURL,
+           spawnZsh(executable: executable, socket: pair[1], parent: pair[0], home: home, columns: columns, rows: rows) {
+            close(pair[1])
+            attach(pair[0])
+            return
+        }
         let result = pterm_start_zsh(pair[1], Int32(columns), Int32(rows))
         guard result == 0 else {
             close(pair[0])
@@ -162,10 +170,69 @@ final class ZshSession {
             startBuiltin()
             return
         }
-        master = pair[0]
-        writeFD = pair[0]
+        attach(pair[0])
+    }
+
+    private func spawnZsh(executable: URL, socket: Int32, parent: Int32, home: URL, columns: UInt16, rows: UInt16) -> Bool {
+        var actions: posix_spawn_file_actions_t?
+        posix_spawn_file_actions_init(&actions)
+        posix_spawn_file_actions_adddup2(&actions, socket, STDIN_FILENO)
+        posix_spawn_file_actions_adddup2(&actions, socket, STDOUT_FILENO)
+        posix_spawn_file_actions_adddup2(&actions, socket, STDERR_FILENO)
+        posix_spawn_file_actions_addclose(&actions, parent)
+        posix_spawn_file_actions_addclose(&actions, socket)
+        var attr: posix_spawnattr_t?
+        posix_spawnattr_init(&attr)
+        defer {
+            posix_spawn_file_actions_destroy(&actions)
+            posix_spawnattr_destroy(&attr)
+        }
+        var environment = ProcessInfo.processInfo.environment
+        environment["HOME"] = home.path
+        environment["ZDOTDIR"] = home.path
+        environment["PTERM_ZSHRC"] = home.appendingPathComponent(".zshrc").path
+        environment["USER"] = "mobile"
+        environment["LOGNAME"] = "mobile"
+        environment["TERM"] = "xterm-256color"
+        environment["COLUMNS"] = "\(columns)"
+        environment["LINES"] = "\(rows)"
+        environment["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin"
+        let arguments = [executable.path, "--pterm-zsh"]
+        var argv: [UnsafeMutablePointer<CChar>?] = arguments.map { strdup($0) }
+        argv.append(nil)
+        var env: [UnsafeMutablePointer<CChar>?] = []
+        for (key, value) in environment {
+            env.append(strdup("\(key)=\(value)"))
+        }
+        env.append(nil)
+        defer {
+            argv.forEach { free($0) }
+            env.forEach { free($0) }
+        }
+        var pid: pid_t = 0
+        let result = argv.withUnsafeMutableBufferPointer { argvBuf in
+            env.withUnsafeMutableBufferPointer { envBuf in
+                posix_spawn(&pid, executable.path, &actions, &attr, argvBuf.baseAddress, envBuf.baseAddress)
+            }
+        }
+        guard result == 0 else {
+            return false
+        }
+        child = pid
+        let process = DispatchSource.makeProcessSource(identifier: pid, eventMask: .exit, queue: .main)
+        process.setEventHandler { [weak self] in
+            self?.noteExit()
+        }
+        watch = process
+        process.resume()
+        return true
+    }
+
+    private func attach(_ fd: Int32) {
+        master = fd
+        writeFD = fd
         translateNewlines = true
-        let owned = pair[0]
+        let owned = fd
         let source = DispatchSource.makeReadSource(fileDescriptor: owned, queue: .global(qos: .userInteractive))
         source.setEventHandler { [weak self] in
             self?.readAvailable()
