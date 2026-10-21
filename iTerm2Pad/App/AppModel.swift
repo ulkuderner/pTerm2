@@ -52,6 +52,9 @@ final class AppModel {
         if CommandLine.arguments.contains("-pterm-shell") {
             tab = .shell
         }
+        if CommandLine.arguments.contains("-pterm-settings") {
+            tab = .settings
+        }
         reload()
     }
 

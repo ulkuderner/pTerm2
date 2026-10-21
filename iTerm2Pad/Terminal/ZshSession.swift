@@ -38,6 +38,7 @@ final class ZshSession {
     private var translateNewlines = false
     private var lastWasReturn = false
     private var launchSource: DispatchSourceFileSystemObject?
+    private var commandTimer: DispatchSourceTimer?
     private var launchFD: Int32 = -1
 
     static var accountHome: String {
@@ -91,6 +92,8 @@ final class ZshSession {
         builtin = nil
         launchSource?.cancel()
         launchSource = nil
+        commandTimer?.cancel()
+        commandTimer = nil
         if writeFD >= 0, writeFD != master {
             close(writeFD)
         }
@@ -157,9 +160,13 @@ final class ZshSession {
             setenv("PTERM_APP", executable.path, 1)
         }
         let launchDir = home.appendingPathComponent("Library/Caches/pterm-launch", isDirectory: true)
+        let commandDir = home.appendingPathComponent("Library/Caches/pterm-cmd", isDirectory: true)
         try? FileManager.default.createDirectory(at: launchDir, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(at: commandDir, withIntermediateDirectories: true)
         setenv("PTERM_LAUNCH_DIR", launchDir.path, 1)
+        setenv("PTERM_CMD_DIR", commandDir.path, 1)
         watchLaunches(at: launchDir)
+        watchCommands(at: commandDir)
         if CommandLine.arguments.contains("-pterm-uitest") {
             setenv("PTERM_UTEST", "1", 1)
             try? Data("1".utf8).write(to: home.appendingPathComponent(".pterm-utest"))
@@ -215,6 +222,7 @@ final class ZshSession {
         environment["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin"
         environment["PTERM_APP"] = executable.path
         environment["PTERM_LAUNCH_DIR"] = home.appendingPathComponent("Library/Caches/pterm-launch").path
+        environment["PTERM_CMD_DIR"] = home.appendingPathComponent("Library/Caches/pterm-cmd").path
         let arguments = [executable.path, "--pterm-zsh"]
         var argv: [UnsafeMutablePointer<CChar>?] = arguments.map { strdup($0) }
         argv.append(nil)
@@ -284,7 +292,7 @@ final class ZshSession {
         try? fileManager.createDirectory(at: prefix.appendingPathComponent("Cellar"), withIntermediateDirectories: true)
         let zshrc = home.appendingPathComponent(".zshrc")
         let stamp = home.appendingPathComponent(".pterm2-zshrc")
-        if (try? String(contentsOf: stamp, encoding: .utf8)) != "19" {
+        if (try? String(contentsOf: stamp, encoding: .utf8)) != "22" {
             let bundledP10k = Bundle.main.bundleURL.appendingPathComponent("Shell/omz/p10k.zsh")
             let installedP10k = home.appendingPathComponent(".p10k.zsh")
             if fileManager.fileExists(atPath: bundledP10k.path) {
@@ -311,13 +319,31 @@ final class ZshSession {
             [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
             cd "$HOME"
             pterm_arm() {
-              if [[ -z $PTERM_APP ]]; then
-                print -r -- "pterm: ARM runner missing"
+              emulate -L zsh
+              local dir=$PTERM_CMD_DIR
+              if [[ -z $dir ]]; then
+                print -ru2 -- "pterm: command directory missing"
                 return 127
               fi
-              "$PTERM_APP" --pterm-exec "$@"
+              local id="c${RANDOM}$SECONDS"
+              print -r -- "$PWD" > "$dir/$id.pwd"
+              print -l -- "$@" > "$dir/$id.ready"
+              local spins=0
+              while [[ ! -f $dir/$id.out && spins -lt 400 ]]; do
+                read -t 0.05 || true
+                (( spins++ ))
+              done
+              if [[ ! -f $dir/$id.out ]]; then
+                print -ru2 -- "pterm: $1 timed out"
+                return 127
+              fi
+              local text="$(<"$dir/$id.out")"
+              [[ -z $text ]] || print -r -- "$text"
+              local code=1
+              [[ -f $dir/$id.code ]] && code=$(<"$dir/$id.code")
+              return $code
             }
-            for pterm_cmd in ls cat mkdir touch rm cp mv grep egrep fgrep head wc whoami uname date setenv ssh mosh scp git sshfs umount python3 python pip3 pip brew; do
+            for pterm_cmd in ls cat mkdir touch rm cp mv grep egrep fgrep head wc ssh mosh scp git sshfs umount python3 python pip3 pip brew; do
               unalias "$pterm_cmd" 2>/dev/null
               eval "$pterm_cmd() { pterm_arm $pterm_cmd \\"\\$@\\"; }"
             done
@@ -332,7 +358,7 @@ final class ZshSession {
             fi
             """
             try? text.write(to: zshrc, atomically: true, encoding: .utf8)
-            try? Data("19".utf8).write(to: stamp)
+            try? Data("22".utf8).write(to: stamp)
         }
         return home
     }
@@ -355,6 +381,45 @@ final class ZshSession {
         }
         launchSource = source
         source.resume()
+    }
+
+    private func watchCommands(at directory: URL) {
+        let timer = DispatchSource.makeTimerSource(queue: .main)
+        timer.schedule(deadline: .now(), repeating: .milliseconds(40))
+        timer.setEventHandler { [weak self] in
+            self?.drainCommands(at: directory)
+        }
+        commandTimer = timer
+        timer.resume()
+    }
+
+    private func drainCommands(at directory: URL) {
+        let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+        for ready in files where ready.pathExtension == "ready" {
+            let id = ready.deletingPathExtension().lastPathComponent
+            let pwdURL = directory.appendingPathComponent("\(id).pwd")
+            let pwd = (try? String(contentsOf: pwdURL, encoding: .utf8)) ?? ""
+            let raw = (try? String(contentsOf: ready, encoding: .utf8)) ?? ""
+            var argv = raw.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+            if argv.last?.isEmpty == true {
+                argv.removeLast()
+            }
+            let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+            let session = ShellSession(home: home)
+            session.useDirectory(pwd)
+            var text = ""
+            session.output = { text += $0 }
+            let code = argv.isEmpty ? 0 : session.run(arguments: argv)
+            if SSHLaunchMailbox.pending != nil {
+                NotificationCenter.default.post(name: .ptermSSHLaunch, object: nil)
+            }
+            let codeURL = directory.appendingPathComponent("\(id).code")
+            let outURL = directory.appendingPathComponent("\(id).out")
+            try? Data("\(code)\n".utf8).write(to: codeURL)
+            try? Data(text.utf8).write(to: outURL)
+            try? FileManager.default.removeItem(at: ready)
+            try? FileManager.default.removeItem(at: pwdURL)
+        }
     }
 
     private func drainLaunches(at directory: URL) {

@@ -38,7 +38,12 @@ public final class ShellSession: @unchecked Sendable {
     }
 
     public func useCurrentDirectory() {
-        context.workingDirectory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
+        useDirectory(FileManager.default.currentDirectoryPath)
+    }
+
+    public func useDirectory(_ path: String) {
+        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        context.workingDirectory = URL(fileURLWithPath: trimmed.isEmpty ? context.home.path : trimmed, isDirectory: true)
     }
 
     public func prompt() -> String {

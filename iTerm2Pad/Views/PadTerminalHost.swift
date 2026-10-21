@@ -65,6 +65,18 @@ enum TerminalFont {
 
 final class FocusTerminalView: TerminalView {
     var onFocus: (() -> Void)?
+    var onSubmit: (() -> Void)?
+
+    override var keyCommands: [UIKeyCommand]? {
+        var commands = super.keyCommands ?? []
+        commands.append(UIKeyCommand(input: "\r", modifierFlags: [], action: #selector(padSubmitLine)))
+        commands.append(UIKeyCommand(input: "\n", modifierFlags: [], action: #selector(padSubmitLine)))
+        return commands
+    }
+
+    @objc func padSubmitLine() {
+        onSubmit?()
+    }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         onFocus?()
@@ -100,6 +112,9 @@ final class PadTerminalHost: UIView, TerminalViewDelegate {
         isAccessibilityElement = false
         terminal.isAccessibilityElement = true
         terminal.accessibilityIdentifier = "TerminalPane"
+        terminal.onSubmit = { [weak self] in
+            self?.submitLine()
+        }
         TerminalSplitShortcut.install()
         builtinAccessory = terminal.inputAccessoryView
         applyCurrentTheme()
@@ -182,6 +197,17 @@ final class PadTerminalHost: UIView, TerminalViewDelegate {
         terminal.reloadInputViews()
     }
 
+    private var lastSubmit = Date.distantPast
+
+    private func submitLine() {
+        let now = Date()
+        if now.timeIntervalSince(lastSubmit) < 0.05 {
+            return
+        }
+        lastSubmit = now
+        onBytes?(Data("\r".utf8))
+    }
+
     func handleKey(_ presses: Set<UIPress>) -> Bool {
         for press in presses {
             guard let key = press.key else {
@@ -204,6 +230,10 @@ final class PadTerminalHost: UIView, TerminalViewDelegate {
             }
             if flags.contains(.command), !flags.contains(.control), plain == "v" {
                 terminal.paste(nil)
+                return true
+            }
+            if key.keyCode == .keyboardReturn || key.characters == "\r" || key.characters == "\n" {
+                submitLine()
                 return true
             }
             let isControlD = key.characters == "\u{4}" || (flags.contains(.control) && isD && !flags.contains(.command))

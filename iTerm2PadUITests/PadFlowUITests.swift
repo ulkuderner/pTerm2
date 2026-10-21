@@ -62,6 +62,21 @@ final class PadFlowUITests: XCTestCase {
         app.typeText(text + "\n")
     }
 
+    private func typeCommand(_ text: String, in app: XCUIApplication) {
+        for character in text {
+            if character == " " {
+                app.typeKey(XCUIKeyboardKey.space.rawValue, modifierFlags: [])
+            } else {
+                app.typeKey(String(character), modifierFlags: [])
+            }
+        }
+        let ret = app.keyboards.buttons["return"]
+        if ret.waitForExistence(timeout: 2) {
+            ret.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        }
+        app.typeKey(XCUIKeyboardKey.return.rawValue, modifierFlags: [])
+    }
+
     private func waitUntil(timeout: TimeInterval, _ predicate: () -> Bool) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
@@ -71,6 +86,62 @@ final class PadFlowUITests: XCTestCase {
             RunLoop.current.run(until: Date().addingTimeInterval(0.3))
         }
         return predicate()
+    }
+
+    func testSettingsTapStaysUp() throws {
+        let app = XCUIApplication()
+        app.launch()
+
+        let settings = app.buttons.matching(identifier: "gearshape.fill").firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: 8), "Settings tab is missing")
+        settings.tap()
+        XCTAssertTrue(app.staticTexts["libssh2"].waitForExistence(timeout: 5),
+                      "Settings did not appear: \(app.debugDescription)")
+        XCTAssertEqual(app.state, .runningForeground)
+
+        openTab("Shell", in: app)
+        let pane = app.descendants(matching: .any)["TerminalPane"]
+        XCTAssertTrue(pane.waitForExistence(timeout: 15))
+        app.buttons.matching(identifier: "gearshape.fill").firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["libssh2"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.state, .runningForeground)
+    }
+
+    func testTypedShellCommands() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-pterm-shell", "-pterm-uitest"]
+        app.launch()
+
+        let pane = app.descendants(matching: .any)["TerminalPane"]
+        XCTAssertTrue(pane.waitForExistence(timeout: 20))
+        XCTAssertTrue(waitUntil(timeout: 25) {
+            let text = self.screenText(pane)
+            return text.contains("~") || text.contains("%")
+        }, "prompt did not appear: \(screenText(pane))")
+
+        pane.tap()
+        typeCommand("ls", in: app)
+        XCTAssertTrue(waitUntil(timeout: 12) {
+            let text = self.screenText(pane)
+            return text.contains("Documents") && text.contains("opt")
+        }, "ls printed nothing: \(screenText(pane))")
+
+        typeCommand("git status", in: app)
+        XCTAssertTrue(waitUntil(timeout: 12) {
+            self.screenText(pane).localizedCaseInsensitiveContains("not a git repository")
+        }, "git status missing: \(screenText(pane))")
+
+        typeCommand("brew --prefix", in: app)
+        XCTAssertTrue(waitUntil(timeout: 12) {
+            self.screenText(pane).contains("opt/homebrew")
+        }, "brew prefix missing: \(screenText(pane))")
+
+        openTab("Settings", in: app)
+        XCTAssertTrue(app.staticTexts["libssh2"].waitForExistence(timeout: 5),
+                      "Settings crashed after the shell was used: \(app.debugDescription)")
+        openTab("Keys", in: app)
+        XCTAssertTrue(app.staticTexts["Keys"].waitForExistence(timeout: 5) || app.buttons["Import Key"].waitForExistence(timeout: 2))
+        XCTAssertEqual(app.state, .runningForeground)
     }
 
     func testLocalShellAndTabs() throws {
@@ -111,15 +182,18 @@ final class PadFlowUITests: XCTestCase {
     }
 
     private func openTab(_ title: String, in app: XCUIApplication) {
-        let candidates = [
-            app.tabBars.buttons[title],
-            app.buttons[title],
-            app.staticTexts[title],
-            app.cells[title]
+        let symbols = [
+            "Hosts": "server.rack",
+            "Shell": "terminal",
+            "Keys": "key.fill",
+            "Settings": "gearshape.fill"
         ]
-        if let match = candidates.first(where: { $0.exists }) {
-            match.tap()
-            return
+        if let symbol = symbols[title] {
+            let button = app.buttons.matching(identifier: symbol).firstMatch
+            if button.waitForExistence(timeout: 3) {
+                button.tap()
+                return
+            }
         }
         let labeled = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", title)).firstMatch
         XCTAssertTrue(labeled.waitForExistence(timeout: 3), "Missing \(title)")

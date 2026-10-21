@@ -133,11 +133,12 @@ struct CPCommand: ShellCommand {
 struct MVCommand: ShellCommand {
     let name = "mv"
     func run(arguments: [String], context: inout CommandContext) throws -> Int32 {
-        guard arguments.count >= 2 else {
+        let files = arguments.filter { !$0.hasPrefix("-") }
+        guard files.count >= 2 else {
             throw ShellError.usage("mv: missing destination")
         }
-        try FileManager.default.moveItem(at: resolve(arguments[0], relativeTo: context),
-                                         to: resolve(arguments[1], relativeTo: context))
+        try FileManager.default.moveItem(at: resolve(files[0], relativeTo: context),
+                                         to: resolve(files[1], relativeTo: context))
         return 0
     }
 }

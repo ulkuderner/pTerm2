@@ -1,0 +1,168 @@
+#!/usr/bin/env python3
+"""Cross-compile a Homebrew formula for iPad ARM64.
+
+macOS bottles are Mach-O binaries built for macOS. iPadOS will not start them.
+This tool reads the formula from the local Homebrew, downloads its source, and
+rebuilds it with the iOS SDK into Build/ipad-homebrew.
+"""
+
+import argparse
+import hashlib
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tarfile
+import urllib.request
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+WORK = ROOT / "Build" / "ipad-homebrew"
+MIN_OS = "17.0"
+
+
+def run(cmd, cwd=None, env=None):
+    print("+", " ".join(cmd), flush=True)
+    completed = subprocess.run(cmd, cwd=cwd, env=env)
+    if completed.returncode != 0:
+        raise SystemExit(completed.returncode)
+
+
+def brew_formula(name):
+    raw = subprocess.check_output(["brew", "info", "--json=v2", name])
+    formulae = json.loads(raw)["formulae"]
+    if not formulae:
+        raise SystemExit(f"brew formula not found: {name}")
+    return formulae[0]
+
+
+def sdk_path(sdk):
+    return subprocess.check_output(["xcrun", "--sdk", sdk, "--show-sdk-path"], text=True).strip()
+
+
+def compiler_env(sdk):
+    sysroot = sdk_path(sdk)
+    if sdk == "iphoneos":
+        target = f"arm64-apple-ios{MIN_OS}"
+    else:
+        target = f"arm64-apple-ios{MIN_OS}-simulator"
+    flags = f"-arch arm64 -isysroot {sysroot} -target {target}"
+    clang = subprocess.check_output(["xcrun", "--sdk", sdk, "-f", "clang"], text=True).strip()
+    clangxx = subprocess.check_output(["xcrun", "--sdk", sdk, "-f", "clang++"], text=True).strip()
+    env = os.environ.copy()
+    env.update({
+        "CC": clang,
+        "CXX": clangxx,
+        "CFLAGS": flags,
+        "CXXFLAGS": flags,
+        "LDFLAGS": flags,
+        "CPPFLAGS": f"-isysroot {sysroot}",
+    })
+    return env
+
+
+def inspect(name):
+    formula = brew_formula(name)
+    stable = formula["urls"]["stable"]
+    files = (formula.get("bottle") or {}).get("stable", {}).get("files", {})
+    print(f"{formula['name']} {formula['versions']['stable']}")
+    print(f"source: {stable['url']}")
+    print(f"dependencies: {' '.join(formula['dependencies']) or '(none)'}")
+    if files:
+        print("macOS bottles:")
+        for platform in files:
+            print(f"  {platform}")
+    print("iPad build: source is recompiled with the iOS SDK. The bottle is not reused.")
+
+
+def cache_source(formula):
+    stable = formula["urls"]["stable"]
+    url = stable["url"]
+    digest = stable.get("checksum")
+    src_root = WORK / "src"
+    src_root.mkdir(parents=True, exist_ok=True)
+    filename = url.rsplit("/", 1)[-1]
+    archive = src_root / filename
+    if not archive.exists():
+        print(f"downloading {url}")
+        urllib.request.urlretrieve(url, archive)
+    if digest:
+        actual = hashlib.sha256(archive.read_bytes()).hexdigest()
+        if actual != digest:
+            raise SystemExit(f"checksum mismatch for {archive.name}: {actual}")
+    dest = src_root / f"{formula['name']}-{formula['versions']['stable']}"
+    if dest.exists():
+        shutil.rmtree(dest)
+    dest.mkdir()
+    with tarfile.open(archive) as tar:
+        tar.extractall(dest)
+    children = [path for path in dest.iterdir() if path.name != "pax_global_header"]
+    if len(children) == 1 and children[0].is_dir():
+        return children[0]
+    return dest
+
+
+def build(name, sdk):
+    formula = brew_formula(name)
+    source = cache_source(formula)
+    prefix = WORK / sdk / formula["name"] / formula["versions"]["stable"]
+    if prefix.exists():
+        shutil.rmtree(prefix)
+    prefix.mkdir(parents=True)
+    env = compiler_env(sdk)
+    if (source / "configure").exists():
+        run(["./configure", f"--prefix={prefix}", "--host=aarch64-apple-darwin", "--disable-shared"],
+            cwd=source, env=env)
+        run(["make", "-j", str(os.cpu_count() or 4)], cwd=source, env=env)
+        run(["make", "install"], cwd=source, env=env)
+    elif (source / "CMakeLists.txt").exists():
+        build_dir = source / "build-ipad"
+        if build_dir.exists():
+            shutil.rmtree(build_dir)
+        run(["cmake", "-S", str(source), "-B", str(build_dir), f"-DCMAKE_INSTALL_PREFIX={prefix}",
+             "-DCMAKE_BUILD_TYPE=Release", f"-DCMAKE_C_COMPILER={env['CC']}",
+             f"-DCMAKE_CXX_COMPILER={env['CXX']}", f"-DCMAKE_C_FLAGS={env['CFLAGS']}",
+             f"-DCMAKE_CXX_FLAGS={env['CXXFLAGS']}", f"-DCMAKE_EXE_LINKER_FLAGS={env['LDFLAGS']}"],
+            env=env)
+        run(["cmake", "--build", str(build_dir), "--parallel"], env=env)
+        run(["cmake", "--install", str(build_dir)], env=env)
+    elif (source / "Makefile").exists():
+        run(["make", "-j", str(os.cpu_count() or 4), f"PREFIX={prefix}", f"CC={env['CC']}"],
+            cwd=source, env=env)
+        run(["make", "install", f"PREFIX={prefix}"], cwd=source, env=env)
+    else:
+        raise SystemExit(f"no configure, CMake, or Makefile in {source}")
+    binaries = sorted(path for path in prefix.rglob("*") if path.is_file() and os.access(path, os.X_OK))
+    print(f"installed {len(binaries)} executable(s) into {prefix}")
+    for binary in binaries:
+        show_platform(binary)
+
+
+def show_platform(binary):
+    try:
+        output = subprocess.check_output(["vtool", "-show-build", str(binary)], text=True, stderr=subprocess.DEVNULL)
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        output = subprocess.check_output(["otool", "-l", str(binary)], text=True)
+    platform = "unknown"
+    for line in output.splitlines():
+        if "platform " in line and "platform" in line.lower():
+            platform = line.strip()
+            break
+    print(f"  {binary.relative_to(WORK)}  {platform}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Rebuild a Homebrew formula for iPad ARM64")
+    parser.add_argument("action", choices=["inspect", "build"])
+    parser.add_argument("formula")
+    parser.add_argument("--sdk", choices=["iphoneos", "iphonesimulator"], default="iphoneos")
+    args = parser.parse_args()
+    if args.action == "inspect":
+        inspect(args.formula)
+    else:
+        build(args.formula, args.sdk)
+
+
+if __name__ == "__main__":
+    main()

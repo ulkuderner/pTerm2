@@ -35,12 +35,11 @@ struct AgentTool: Identifiable, Equatable {
     static let all = [claude, openai, gemini]
 
     func executable() -> String? {
-        let home = ZshSession.accountHome
+        let home = NSHomeDirectory()
         let directories = [
             "\(home)/.local/bin",
-            "/opt/homebrew/bin",
-            "/usr/local/bin",
-            "/usr/bin"
+            "\(home)/opt/homebrew/bin",
+            "\(home)/Library/bin"
         ]
         for name in binaries {
             for directory in directories {
