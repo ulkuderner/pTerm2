@@ -21,7 +21,7 @@ BUNDLE_ID = 'com.caglar.pTerm2'
 TEAM = 'W4A4C428H6'
 DEPLOYMENT_TARGET = '17.0'
 MARKETING_VERSION = '1.0'
-CURRENT_PROJECT_VERSION = '20'
+CURRENT_PROJECT_VERSION = '21'
 SWIFTTERM_URL = 'https://github.com/migueldeicaza/SwiftTerm.git'
 # 1.99+ pulls a build plugin that Xcode rejects without user trust.
 # 1.5.1 is the last simple iOS TerminalView release without that plugin.

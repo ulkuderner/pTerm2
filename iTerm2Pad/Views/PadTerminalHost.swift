@@ -232,6 +232,10 @@ final class PadTerminalHost: UIView, TerminalViewDelegate {
                 terminal.paste(nil)
                 return true
             }
+            if key.keyCode == .keyboardDeleteOrBackspace || key.characters == "\u{7f}" || key.characters == "\u{8}" {
+                onBytes?(Data([0x7f]))
+                return true
+            }
             if key.keyCode == .keyboardReturn || key.characters == "\r" || key.characters == "\n" {
                 submitLine()
                 return true

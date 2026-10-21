@@ -43,6 +43,7 @@ final class ZshSession {
     /// Held open for the life of the pane. zsh waits on one byte here instead of forking sleep.
     private var replyFD: Int32 = -1
     private var startupFault: String?
+    private var spawnStatus: Int32 = -1
 
     static var accountHome: String {
         if let users = try? FileManager.default.contentsOfDirectory(atPath: "/Users") {
@@ -206,7 +207,11 @@ final class ZshSession {
             attach(pair[0])
             return
         }
-        emit("pterm: in-process shell\r\n")
+        if spawnStatus >= 0 {
+            emit("pterm: in-process shell (spawn \(spawnStatus))\r\n")
+        } else {
+            emit("pterm: in-process shell\r\n")
+        }
         let result = pterm_start_zsh(pair[1], Int32(columns), Int32(rows))
         guard result == 0 else {
             close(pair[0])
@@ -284,6 +289,7 @@ final class ZshSession {
                 posix_spawn(&pid, executable.path, &actions, &attr, argvBuf.baseAddress, envBuf.baseAddress)
             }
         }
+        spawnStatus = result
         guard result == 0 else {
             return false
         }
@@ -346,7 +352,7 @@ final class ZshSession {
         try? fileManager.createDirectory(at: prefix.appendingPathComponent("Cellar"), withIntermediateDirectories: true)
         let zshrc = profile.appendingPathComponent(".zshrc")
         let stamp = profile.appendingPathComponent(".pterm2-zshrc")
-        if (try? String(contentsOf: stamp, encoding: .utf8)) != "38" {
+        if (try? String(contentsOf: stamp, encoding: .utf8)) != "39" {
             let bundledP10k = Bundle.main.bundleURL.appendingPathComponent("Shell/omz/p10k.zsh")
             let installedP10k = profile.appendingPathComponent(".p10k.zsh")
             if fileManager.fileExists(atPath: bundledP10k.path) {
@@ -409,13 +415,23 @@ final class ZshSession {
               sysread -i $fd -s 1 -t 4 chunk
               exec {fd}>&-
               if [[ ! -f $dir/$id.out ]]; then
-                print -ru2 -- "pterm: $1 timed out"
+                if [[ -n $PTERM_FD ]]; then
+                  syswrite -o $PTERM_FD -- "pterm: $1 timed out"$'\n'
+                else
+                  print -ru2 -- "pterm: $1 timed out"
+                fi
                 return 127
               fi
               sysopen -r -u fd -- "$dir/$id.out" || return 127
               sysread -i $fd text
               exec {fd}>&-
-              [[ -z $text ]] || print -r -- "$text"
+              if [[ -n $text ]]; then
+                if [[ -n $PTERM_FD ]]; then
+                  syswrite -o $PTERM_FD -- "$text"
+                else
+                  print -r -- "$text"
+                fi
+              fi
               code=1
               if [[ -f $dir/$id.code ]]; then
                 sysopen -r -u fd -- "$dir/$id.code" || return 1
@@ -429,6 +445,9 @@ final class ZshSession {
               eval "$pterm_cmd() { pterm_arm $pterm_cmd \\"\\$@\\"; }"
             done
             unset pterm_cmd
+            if [[ $PS1 == '%m%# ' ]]; then
+              PS1=$'%F{green}%~%f %# '
+            fi
             if [[ -n $PTERM_SELFTEST ]]; then
               print -r -- SELFTEST-LS
               ls
@@ -440,7 +459,7 @@ final class ZshSession {
             """
             do {
                 try text.write(to: zshrc, atomically: false, encoding: .utf8)
-                try Data("38".utf8).write(to: stamp)
+                try Data("39".utf8).write(to: stamp)
             } catch {
                 startupFault = "pterm: shell startup \(zshrc.path) (\(error.localizedDescription))\r\n"
             }

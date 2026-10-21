@@ -74,6 +74,9 @@ static void *pterm_thread(void *raw) {
     if (home && *home) {
         chdir(home);
     }
+    char fdtext[16];
+    snprintf(fdtext, sizeof(fdtext), "%d", fd);
+    setenv("PTERM_FD", fdtext, 1);
     pterm_bind_thread(fd, columns, rows);
     pterm_mark_inprocess();
     zsh_main(3, argv);
@@ -129,6 +132,7 @@ int pterm_enter_zsh(void) {
     if (home && *home) {
         chdir(home);
     }
+    setenv("PTERM_FD", "1", 1);
     pterm_bind_thread(STDIN_FILENO, width, height);
     return zsh_main(3, argv);
 }
