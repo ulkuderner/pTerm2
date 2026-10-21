@@ -1,6 +1,11 @@
 import Darwin
 import Foundation
 import LocalShell
+import SSHClient
+
+extension Notification.Name {
+    static let ptermSSHLaunch = Notification.Name("ptermSSHLaunch")
+}
 
 @_silgen_name("pterm_start_zsh")
 private func pterm_start_zsh(_ fd: Int32, _ columns: Int32, _ rows: Int32) -> Int32
@@ -32,6 +37,8 @@ final class ZshSession {
     private var writeFD: Int32 = -1
     private var translateNewlines = false
     private var lastWasReturn = false
+    private var launchSource: DispatchSourceFileSystemObject?
+    private var launchFD: Int32 = -1
 
     static var accountHome: String {
         if let users = try? FileManager.default.contentsOfDirectory(atPath: "/Users") {
@@ -82,6 +89,8 @@ final class ZshSession {
     func stop() {
         onExit = nil
         builtin = nil
+        launchSource?.cancel()
+        launchSource = nil
         if writeFD >= 0, writeFD != master {
             close(writeFD)
         }
@@ -144,6 +153,13 @@ final class ZshSession {
         setenv("LINES", "\(rows)", 1)
         setenv("PTERM_ZSHRC", home.appendingPathComponent(".zshrc").path, 1)
         setenv("PATH", "/usr/bin:/bin:/usr/sbin:/sbin", 1)
+        if let executable = Bundle.main.executableURL {
+            setenv("PTERM_APP", executable.path, 1)
+        }
+        let launchDir = home.appendingPathComponent("Library/Caches/pterm-launch", isDirectory: true)
+        try? FileManager.default.createDirectory(at: launchDir, withIntermediateDirectories: true)
+        setenv("PTERM_LAUNCH_DIR", launchDir.path, 1)
+        watchLaunches(at: launchDir)
         if CommandLine.arguments.contains("-pterm-uitest") {
             setenv("PTERM_UTEST", "1", 1)
             try? Data("1".utf8).write(to: home.appendingPathComponent(".pterm-utest"))
@@ -197,6 +213,8 @@ final class ZshSession {
         environment["COLUMNS"] = "\(columns)"
         environment["LINES"] = "\(rows)"
         environment["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin"
+        environment["PTERM_APP"] = executable.path
+        environment["PTERM_LAUNCH_DIR"] = home.appendingPathComponent("Library/Caches/pterm-launch").path
         let arguments = [executable.path, "--pterm-zsh"]
         var argv: [UnsafeMutablePointer<CChar>?] = arguments.map { strdup($0) }
         argv.append(nil)
@@ -261,9 +279,12 @@ final class ZshSession {
                                          withIntermediateDirectories: true)
         try? fileManager.createDirectory(at: omz.appendingPathComponent("cache", isDirectory: true),
                                          withIntermediateDirectories: true)
+        let prefix = home.appendingPathComponent("opt/homebrew", isDirectory: true)
+        try? fileManager.createDirectory(at: prefix.appendingPathComponent("bin"), withIntermediateDirectories: true)
+        try? fileManager.createDirectory(at: prefix.appendingPathComponent("Cellar"), withIntermediateDirectories: true)
         let zshrc = home.appendingPathComponent(".zshrc")
         let stamp = home.appendingPathComponent(".pterm2-zshrc")
-        if (try? String(contentsOf: stamp, encoding: .utf8)) != "17" {
+        if (try? String(contentsOf: stamp, encoding: .utf8)) != "19" {
             let bundledP10k = Bundle.main.bundleURL.appendingPathComponent("Shell/omz/p10k.zsh")
             let installedP10k = home.appendingPathComponent(".p10k.zsh")
             if fileManager.fileExists(atPath: bundledP10k.path) {
@@ -289,55 +310,64 @@ final class ZshSession {
             unsetopt xtrace
             [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
             cd "$HOME"
-            unalias ls 2>/dev/null
-            ls() {
-              emulate -L zsh
-              setopt localoptions nullglob
-              local show_all=0 long=0
-              local -a targets
-              local arg
-              for arg in "$@"; do
-                if [[ $arg == -* ]]; then
-                  [[ $arg == *a* ]] && show_all=1
-                  [[ $arg == *l* ]] && long=1
-                else
-                  targets+=("$arg")
-                fi
-              done
-              (( ${#targets} )) || targets=(".")
-              local target name kind
-              for target in "${targets[@]}"; do
-                if [[ ! -e $target ]]; then
-                  print -r -- "ls: $target: No such file or directory"
-                  continue
-                fi
-                if [[ -d $target ]]; then
-                  local -a names
-                  if (( show_all )); then
-                    names=("$target"/.*(N) "$target"/*(N))
-                  else
-                    names=("$target"/*(N))
-                  fi
-                  for name in "${names[@]}"; do
-                    kind="-"
-                    [[ -d $name ]] && kind="d"
-                    [[ -L $name ]] && kind="l"
-                    if (( long )); then
-                      print -r -- "$kind ${name:t}"
-                    else
-                      print -r -- "${name:t}"
-                    fi
-                  done
-                else
-                  print -r -- "$target"
-                fi
-              done
+            pterm_arm() {
+              if [[ -z $PTERM_APP ]]; then
+                print -r -- "pterm: ARM runner missing"
+                return 127
+              fi
+              "$PTERM_APP" --pterm-exec "$@"
             }
+            for pterm_cmd in ls cat mkdir touch rm cp mv grep egrep fgrep head wc whoami uname date setenv ssh mosh scp git sshfs umount python3 python pip3 pip brew; do
+              unalias "$pterm_cmd" 2>/dev/null
+              eval "$pterm_cmd() { pterm_arm $pterm_cmd \\"\\$@\\"; }"
+            done
+            unset pterm_cmd
+            if [[ -n $PTERM_SELFTEST ]]; then
+              print -r -- SELFTEST-LS
+              ls
+              print -r -- SELFTEST-BREW
+              brew --prefix
+              print -r -- SELFTEST-GIT
+              git status
+            fi
             """
             try? text.write(to: zshrc, atomically: true, encoding: .utf8)
-            try? Data("17".utf8).write(to: stamp)
+            try? Data("19".utf8).write(to: stamp)
         }
         return home
+    }
+
+    private func watchLaunches(at directory: URL) {
+        let fd = open(directory.path, O_EVTONLY)
+        guard fd >= 0 else {
+            return
+        }
+        launchFD = fd
+        let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: .write, queue: .main)
+        source.setEventHandler { [weak self] in
+            self?.drainLaunches(at: directory)
+        }
+        source.setCancelHandler { [weak self] in
+            if let fd = self?.launchFD, fd >= 0 {
+                close(fd)
+                self?.launchFD = -1
+            }
+        }
+        launchSource = source
+        source.resume()
+    }
+
+    private func drainLaunches(at directory: URL) {
+        let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+        for file in files where file.pathExtension == "json" {
+            defer { try? FileManager.default.removeItem(at: file) }
+            guard let data = try? Data(contentsOf: file),
+                  let host = try? JSONDecoder().decode(SSHHost.self, from: data) else {
+                continue
+            }
+            SSHLaunchMailbox.stage(host)
+            NotificationCenter.default.post(name: .ptermSSHLaunch, object: nil)
+        }
     }
 
     private func noteExit() {

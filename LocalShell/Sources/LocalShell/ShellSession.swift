@@ -33,6 +33,14 @@ public final class ShellSession: @unchecked Sendable {
         registry.run(line, context: &context)
     }
 
+    public func run(arguments: [String]) -> Int32 {
+        registry.run(arguments: arguments, context: &context)
+    }
+
+    public func useCurrentDirectory() {
+        context.workingDirectory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
+    }
+
     public func prompt() -> String {
         let path = context.workingDirectory.path
         let home = context.home.path

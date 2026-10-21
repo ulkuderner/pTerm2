@@ -35,6 +35,9 @@ struct HomeView: View {
         .onChange(of: model.tab) { _, _ in
             model.consumePendingSSHLaunch()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .ptermSSHLaunch)) { _ in
+            model.consumePendingSSHLaunch()
+        }
     }
 
     private var sessionBinding: Binding<LiveSession?> {

@@ -73,16 +73,23 @@ public final class CommandRegistry: @unchecked Sendable {
         if trimmed.isEmpty {
             return 0
         }
-        let tokens = tokenize(trimmed)
-        guard let name = tokens.first else {
+        return run(arguments: tokenize(trimmed), context: &context)
+    }
+
+    /// Runs an already-split argv. The zsh child passes arguments this way so
+    /// spaces survive the trip into the signed ARM binary.
+    public func run(arguments: [String], context: inout CommandContext) -> Int32 {
+        guard let name = arguments.first else {
             return 0
         }
+        let tokens = arguments
         if name == "help" || name == "?" {
             listCommands(context: context)
             return 0
         }
         if pad_ios_system_ready() != 0, Self.blinkCommands.contains(name) {
-            let rc = trimmed.withCString { pad_ios_system($0) }
+            let line = arguments.joined(separator: " ")
+            let rc = line.withCString { pad_ios_system($0) }
             if rc != -1 {
                 return rc
             }
@@ -110,7 +117,7 @@ public final class CommandRegistry: @unchecked Sendable {
     }
 
     private func listCommands(context: CommandContext) {
-        let extras = ["git", "scp", "ssh", "sshfs", "umount", "python3", "pip3", "mosh"]
+        let extras = ["git", "scp", "ssh", "sshfs", "umount", "python3", "pip3", "mosh", "brew"]
         let names = (Self.blinkCommands + extras + ["help"]).sorted()
         context.stdout(names.joined(separator: "  ") + "\n")
     }
@@ -141,6 +148,7 @@ public final class CommandRegistry: @unchecked Sendable {
         register(UmountCommand())
         register(PythonCommand())
         register(PipCommand())
+        register(BrewCommand())
     }
 
     private func tokenize(_ line: String) -> [String] {

@@ -124,6 +124,17 @@ final class ShellWorkspace {
         }
         session.onOutput = { [weak host] data in
             host?.terminal.feed(byteArray: ArraySlice(data))
+            if CommandLine.arguments.contains("-pterm-log") {
+                let url = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("pterm-screen.log")
+                if FileManager.default.fileExists(atPath: url.path),
+                   let handle = try? FileHandle(forWritingTo: url) {
+                    handle.seekToEndOfFile()
+                    handle.write(data)
+                    try? handle.close()
+                } else {
+                    try? data.write(to: url)
+                }
+            }
             guard let host, let text = String(data: data, encoding: .utf8) else {
                 return
             }

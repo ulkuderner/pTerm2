@@ -10,6 +10,10 @@ public struct SSHLaunchRequest: Equatable, Sendable {
 
 public enum SSHLaunchMailbox {
     public static var pending: SSHLaunchRequest?
+
+    public static func stage(_ host: SSHHost) {
+        pending = SSHLaunchRequest(host: host, password: nil)
+    }
 }
 
 struct SSHCommand: ShellCommand {
