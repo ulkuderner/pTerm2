@@ -207,20 +207,26 @@ final class ZshSession {
             attach(pair[0])
             return
         }
-        if spawnStatus >= 0 {
-            emit("pterm: in-process shell (spawn \(spawnStatus))\r\n")
-        } else {
-            emit("pterm: in-process shell\r\n")
-        }
         let result = pterm_start_zsh(pair[1], Int32(columns), Int32(rows))
-        guard result == 0 else {
-            close(pair[0])
-            close(pair[1])
-            emit("zsh: could not start in the sandbox (\(result))\r\n")
-            startBuiltin()
+        if result == 0 {
+            if spawnStatus >= 0 {
+                emit("pterm: in-process shell (spawn \(spawnStatus))\r\n")
+            } else {
+                emit("pterm: in-process shell\r\n")
+            }
+            attach(pair[0])
             return
         }
-        attach(pair[0])
+        close(pair[0])
+        close(pair[1])
+        if result == EBUSY {
+            missingNotice = String(localized: "Pad.Shell.OtherPane",
+                                   defaultValue: "zsh is running in another pane. This pane uses the built-in shell.",
+                                   comment: "Shown when a second pane cannot start another zsh.")
+        } else {
+            missingNotice = "zsh: could not start in the sandbox (\(result))"
+        }
+        startBuiltin()
     }
 
     private func spawnZsh(executable: URL, socket: Int32, parent: Int32, home: URL, commandDir: URL, columns: UInt16, rows: UInt16) -> Bool {
@@ -352,7 +358,7 @@ final class ZshSession {
         try? fileManager.createDirectory(at: prefix.appendingPathComponent("Cellar"), withIntermediateDirectories: true)
         let zshrc = profile.appendingPathComponent(".zshrc")
         let stamp = profile.appendingPathComponent(".pterm2-zshrc")
-        if (try? String(contentsOf: stamp, encoding: .utf8)) != "39" {
+        if (try? String(contentsOf: stamp, encoding: .utf8)) != "40" {
             let bundledP10k = Bundle.main.bundleURL.appendingPathComponent("Shell/omz/p10k.zsh")
             let installedP10k = profile.appendingPathComponent(".p10k.zsh")
             if fileManager.fileExists(atPath: bundledP10k.path) {
@@ -392,49 +398,51 @@ final class ZshSession {
             if [[ -n $PTERM_UTEST ]]; then
               print -r -- "pterm-complete:$(bindkey '^I')"
             fi
+            pterm_say() {
+              if [[ -n $PTERM_FD ]] && zmodload zsh/system 2>/dev/null; then
+                syswrite -o $PTERM_FD -- "$*"$'\n'
+              elif [[ -n $PTERM_FD ]]; then
+                print -u $PTERM_FD -r -- "$*"
+              else
+                print -ru2 -- "$*"
+              fi
+            }
             pterm_arm() {
               emulate -L zsh
-              zmodload zsh/system 2>/dev/null || return 127
+              zmodload zsh/system 2>/dev/null || { pterm_say "pterm: zsh/system missing"; return 127 }
               local dir=$PTERM_CMD_DIR
               if [[ -z $dir ]]; then
-                print -ru2 -- "pterm: command directory missing"
+                pterm_say "pterm: command directory missing"
                 return 127
               fi
               local id="c${RANDOM}$SECONDS" fd arg text code chunk
-              sysopen -w -o creat,trunc -u fd -- "$dir/$id.pwd" || return 127
+              sysopen -w -o creat,trunc -u fd -- "$dir/$id.pwd" || { pterm_say "pterm: $1 could not queue"; return 127 }
               syswrite -o $fd -- "$PWD"$'\n'
               exec {fd}>&-
-              sysopen -w -o creat,trunc -u fd -- "$dir/$id.args" || return 127
+              sysopen -w -o creat,trunc -u fd -- "$dir/$id.args" || { pterm_say "pterm: $1 could not queue"; return 127 }
               for arg in "$@"; do
                 syswrite -o $fd -- "$arg"$'\n'
               done
               exec {fd}>&-
-              sysopen -w -o creat,trunc -u fd -- "$dir/$id.ready" || return 127
+              sysopen -r -u fd -- "$dir/reply" || { pterm_say "pterm: $1 has no reply pipe"; return 127 }
+              sysread -i $fd -s 1 -t 0 chunk
               exec {fd}>&-
-              sysopen -r -u fd -- "$dir/reply" || return 127
+              sysopen -w -o creat,trunc -u fd -- "$dir/$id.ready" || { pterm_say "pterm: $1 could not queue"; return 127 }
+              exec {fd}>&-
+              sysopen -r -u fd -- "$dir/reply" || { pterm_say "pterm: $1 has no reply pipe"; return 127 }
               sysread -i $fd -s 1 -t 4 chunk
               exec {fd}>&-
               if [[ ! -f $dir/$id.out ]]; then
-                if [[ -n $PTERM_FD ]]; then
-                  syswrite -o $PTERM_FD -- "pterm: $1 timed out"$'\n'
-                else
-                  print -ru2 -- "pterm: $1 timed out"
-                fi
+                pterm_say "pterm: $1 timed out"
                 return 127
               fi
-              sysopen -r -u fd -- "$dir/$id.out" || return 127
+              sysopen -r -u fd -- "$dir/$id.out" || { pterm_say "pterm: $1 unreadable"; return 127 }
               sysread -i $fd text
               exec {fd}>&-
-              if [[ -n $text ]]; then
-                if [[ -n $PTERM_FD ]]; then
-                  syswrite -o $PTERM_FD -- "$text"
-                else
-                  print -r -- "$text"
-                fi
-              fi
+              [[ -z $text ]] || pterm_say "$text"
               code=1
               if [[ -f $dir/$id.code ]]; then
-                sysopen -r -u fd -- "$dir/$id.code" || return 1
+                sysopen -r -u fd -- "$dir/$id.code" || { pterm_say "pterm: $1 unreadable"; return 1 }
                 sysread -i $fd code
                 exec {fd}>&-
               fi
@@ -459,7 +467,7 @@ final class ZshSession {
             """
             do {
                 try text.write(to: zshrc, atomically: false, encoding: .utf8)
-                try Data("39".utf8).write(to: stamp)
+                try Data("40".utf8).write(to: stamp)
             } catch {
                 startupFault = "pterm: shell startup \(zshrc.path) (\(error.localizedDescription))\r\n"
             }
@@ -572,13 +580,15 @@ final class ZshSession {
             self?.writeTerminal(text)
         }
         builtin = shell
-        writeTerminal(String(localized: "Pad.Shell.Sandbox",
-                             defaultValue: "iPad sandbox shell. zsh cannot open a terminal here, so built-in commands are running. Type help.\r\n",
-                             comment: "Banner when the iPad sandbox cannot start zsh."))
+        if let missingNotice {
+            writeTerminal(missingNotice + "\r\n")
+        } else {
+            writeTerminal(String(localized: "Pad.Shell.Sandbox",
+                                 defaultValue: "iPad sandbox shell. zsh cannot open a terminal here, so built-in commands are running. Type help.\r\n",
+                                 comment: "Banner when the iPad sandbox cannot start zsh."))
+        }
         if let launchProgram {
             writeTerminal("\(launchProgram) is not available in the iPad sandbox.\r\n")
-        } else if let missingNotice {
-            writeTerminal(missingNotice + "\r\n")
         }
         writeTerminal(shell.prompt())
     }

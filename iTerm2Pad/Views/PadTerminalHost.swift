@@ -232,10 +232,6 @@ final class PadTerminalHost: UIView, TerminalViewDelegate {
                 terminal.paste(nil)
                 return true
             }
-            if key.keyCode == .keyboardDeleteOrBackspace || key.characters == "\u{7f}" || key.characters == "\u{8}" {
-                onBytes?(Data([0x7f]))
-                return true
-            }
             if key.keyCode == .keyboardReturn || key.characters == "\r" || key.characters == "\n" {
                 submitLine()
                 return true
@@ -260,14 +256,23 @@ private enum TerminalSplitShortcut {
         installed = true
         let original = class_getInstanceMethod(TerminalView.self, #selector(UIResponder.pressesBegan(_:with:)))
         let hooked = class_getInstanceMethod(TerminalView.self, #selector(TerminalView.pad_pressesBegan(_:with:)))
-        guard let original, let hooked else {
-            return
+        if let original, let hooked {
+            method_exchangeImplementations(original, hooked)
         }
-        method_exchangeImplementations(original, hooked)
+        let erase = class_getInstanceMethod(TerminalView.self, #selector(UIKeyInput.deleteBackward))
+        let eraseHook = class_getInstanceMethod(TerminalView.self, #selector(TerminalView.pad_deleteBackward))
+        if let erase, let eraseHook {
+            method_exchangeImplementations(erase, eraseHook)
+        }
     }
 }
 
 extension TerminalView {
+    /// Software-keyboard delete reaches here with an empty local buffer. Send erase and do not insert a space.
+    @objc func pad_deleteBackward() {
+        send([0x7f])
+    }
+
     @objc func pad_pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
         var view: UIView? = self
         while let current = view {
