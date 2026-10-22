@@ -24,6 +24,7 @@ int pad_ssh_exec(PadSSHSession *session, const char *command, int columns, int r
 int pad_ssh_read(PadSSHSession *session, void *buffer, size_t length);
 int pad_ssh_write(PadSSHSession *session, const void *buffer, size_t length);
 int pad_ssh_resize(PadSSHSession *session, int columns, int rows);
+void pad_ssh_set_timeout(PadSSHSession *session, long milliseconds);
 void pad_ssh_disconnect(PadSSHSession *session);
 
 int pad_scp_send(const char *host,
@@ -53,6 +54,8 @@ int pad_sftp_list(PadSSHSession *session,
                   char *out,
                   size_t outlen);
 
+const char *pad_ssh_auth_methods(PadSSHSession *session);
+const char *pad_ssh_banner(PadSSHSession *session);
 int pad_ssh_backend_ready(void);
 
 #ifdef __cplusplus

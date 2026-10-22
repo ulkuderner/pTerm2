@@ -314,10 +314,11 @@ struct ClaudeCommand: ShellCommand {
     let name = "claude"
 
     func run(arguments: [String], context: inout CommandContext) throws -> Int32 {
-        if arguments.contains("--version") || arguments.contains("-v") {
+        if arguments.contains("--version") {
             context.stdout("2.1.304 (pTerm)\n")
             return 0
         }
+        let verbose = arguments.contains("-v") || arguments.contains("--verbose")
         if arguments.contains("-h") || arguments.contains("--help") {
             context.stdout(usage)
             return 0
@@ -334,6 +335,9 @@ struct ClaudeCommand: ShellCommand {
             return 1
         }
         do {
+            if verbose {
+                context.stdout("claude: model \(parsed.model)\nclaude: POST https://api.anthropic.com/v1/messages\n")
+            }
             let json = try claudeRequest(auth: auth, body: [
                 "model": parsed.model,
                 "max_tokens": 1024,
@@ -357,7 +361,7 @@ struct ClaudeCommand: ShellCommand {
 
     private var usage: String {
         String(localized: "Shell.Claude.Usage",
-               defaultValue: "Usage: claude\nclaude -p TEXT\nclaude --version\n",
+               defaultValue: "Usage: claude\nclaude -p TEXT\nclaude -v -p TEXT\nclaude --version\n",
                comment: "Usage for the built-in claude command. Bare claude opens a session.")
     }
 

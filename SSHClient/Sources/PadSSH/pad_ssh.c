@@ -16,6 +16,8 @@ struct PadSSHSession {
     int sock;
     LIBSSH2_SESSION *session;
     LIBSSH2_CHANNEL *channel;
+    char auth_methods[256];
+    char banner[128];
 };
 
 static int tcp_connect(const char *host, int port, char *errbuf, size_t errlen) {
@@ -47,7 +49,22 @@ static int tcp_connect(const char *host, int port, char *errbuf, size_t errlen) 
     return sock;
 }
 
-static char kbd_password[256];
+static int offers(const char *list, const char *method) {
+    if (!list || !method) {
+        return 0;
+    }
+    size_t length = strlen(method);
+    const char *cursor = list;
+    while ((cursor = strstr(cursor, method)) != NULL) {
+        int at_start = cursor == list || cursor[-1] == ',';
+        int at_end = cursor[length] == '\0' || cursor[length] == ',';
+        if (at_start && at_end) {
+            return 1;
+        }
+        cursor += length;
+    }
+    return 0;
+}
 
 static void keyboard_callback(const char *name, int name_len,
                               const char *instruction, int instruction_len,
@@ -56,18 +73,35 @@ static void keyboard_callback(const char *name, int name_len,
                               LIBSSH2_USERAUTH_KBDINT_RESPONSE *responses,
                               void **abstract) {
     (void)name; (void)name_len; (void)instruction; (void)instruction_len;
-    (void)prompts; (void)abstract;
+    const char *password = (abstract && *abstract) ? *abstract : "";
     for (int i = 0; i < num_prompts; i++) {
-        size_t length = strlen(kbd_password);
+        int hidden = prompts && prompts[i].echo == 0;
+        const char *answer = (hidden || num_prompts == 1) ? password : "";
+        size_t length = strlen(answer);
         responses[i].text = malloc(length + 1);
         if (!responses[i].text) {
             responses[i].length = 0;
             continue;
         }
-        memcpy(responses[i].text, kbd_password, length + 1);
+        memcpy(responses[i].text, answer, length + 1);
         responses[i].length = (unsigned int)length;
     }
 }
+
+static void auth_fail(LIBSSH2_SESSION *session, const char *methods, char *errbuf, size_t errlen) {
+    char *message = NULL;
+    int length = 0;
+    int code = libssh2_session_last_error(session, &message, &length, 0);
+    if (methods && methods[0]) {
+        snprintf(errbuf, errlen, "authentication failed (%d). server allows: %s", code, methods);
+    } else if (message && message[0]) {
+        snprintf(errbuf, errlen, "authentication failed (%d): %.180s", code, message);
+    } else {
+        snprintf(errbuf, errlen, "authentication failed (%d)", code);
+    }
+}
+
+static char g_auth_methods[256];
 
 static int authenticate(LIBSSH2_SESSION *session,
                         const char *user,
@@ -75,7 +109,28 @@ static int authenticate(LIBSSH2_SESSION *session,
                         const char *password,
                         char *errbuf,
                         size_t errlen) {
-    if (private_key_pem && private_key_pem[0]) {
+    if (!user) {
+        snprintf(errbuf, errlen, "authentication failed");
+        return -1;
+    }
+    g_auth_methods[0] = '\0';
+    if (libssh2_userauth_authenticated(session)) {
+        return 0;
+    }
+    char methods[256];
+    methods[0] = '\0';
+    char *listed = libssh2_userauth_list(session, user, (unsigned int)strlen(user));
+    if (libssh2_userauth_authenticated(session)) {
+        return 0;
+    }
+    if (listed) {
+        strncpy(methods, listed, sizeof(methods) - 1);
+        methods[sizeof(methods) - 1] = '\0';
+    }
+    int known = methods[0] != '\0';
+    strncpy(g_auth_methods, methods, sizeof(g_auth_methods) - 1);
+    g_auth_methods[sizeof(g_auth_methods) - 1] = '\0';
+    if (private_key_pem && private_key_pem[0] && (!known || offers(methods, "publickey"))) {
         int rc = libssh2_userauth_publickey_frommemory(session,
                                                        user,
                                                        strlen(user),
@@ -88,19 +143,22 @@ static int authenticate(LIBSSH2_SESSION *session,
             return 0;
         }
     }
-    if (password && password[0]) {
-        int rc = libssh2_userauth_password(session, user, password);
-        if (rc == 0) {
-            return 0;
+    if (password) {
+        *libssh2_session_abstract(session) = (void *)password;
+        if (!known || offers(methods, "keyboard-interactive")) {
+            int rc = libssh2_userauth_keyboard_interactive(session, user, keyboard_callback);
+            if (rc == 0) {
+                return 0;
+            }
         }
-        strncpy(kbd_password, password, sizeof(kbd_password) - 1);
-        kbd_password[sizeof(kbd_password) - 1] = '\0';
-        rc = libssh2_userauth_keyboard_interactive(session, user, keyboard_callback);
-        if (rc == 0) {
-            return 0;
+        if (!known || offers(methods, "password")) {
+            int rc = libssh2_userauth_password(session, user, password);
+            if (rc == 0) {
+                return 0;
+            }
         }
     }
-    snprintf(errbuf, errlen, "authentication failed");
+    auth_fail(session, methods, errbuf, errlen);
     return -1;
 }
 
@@ -143,6 +201,11 @@ PadSSHSession *pad_ssh_connect(const char *host,
     }
     out->sock = sock;
     out->session = session;
+    strncpy(out->auth_methods, g_auth_methods, sizeof(out->auth_methods) - 1);
+    const char *banner = libssh2_session_banner_get(session);
+    if (banner) {
+        strncpy(out->banner, banner, sizeof(out->banner) - 1);
+    }
     return out;
 }
 
@@ -196,6 +259,13 @@ int pad_ssh_resize(PadSSHSession *session, int columns, int rows) {
         return -1;
     }
     return libssh2_channel_request_pty_size(session->channel, columns, rows);
+}
+
+void pad_ssh_set_timeout(PadSSHSession *session, long milliseconds) {
+    if (!session || !session->session) {
+        return;
+    }
+    libssh2_session_set_timeout(session->session, milliseconds);
 }
 
 void pad_ssh_disconnect(PadSSHSession *session) {
@@ -355,6 +425,20 @@ int pad_ssh_backend_ready(void) {
     return 1;
 }
 
+const char *pad_ssh_auth_methods(PadSSHSession *session) {
+    if (!session) {
+        return "";
+    }
+    return session->auth_methods;
+}
+
+const char *pad_ssh_banner(PadSSHSession *session) {
+    if (!session) {
+        return "";
+    }
+    return session->banner;
+}
+
 #else
 
 struct PadSSHSession {
@@ -406,6 +490,10 @@ int pad_ssh_resize(PadSSHSession *session, int columns, int rows) {
     return -1;
 }
 
+void pad_ssh_set_timeout(PadSSHSession *session, long milliseconds) {
+    (void)session; (void)milliseconds;
+}
+
 void pad_ssh_disconnect(PadSSHSession *session) {
     (void)session;
 }
@@ -447,6 +535,16 @@ int pad_sftp_list(PadSSHSession *session, const char *path, char *out, size_t ou
 
 int pad_ssh_backend_ready(void) {
     return 0;
+}
+
+const char *pad_ssh_auth_methods(PadSSHSession *session) {
+    (void)session;
+    return "";
+}
+
+const char *pad_ssh_banner(PadSSHSession *session) {
+    (void)session;
+    return "";
 }
 
 #endif

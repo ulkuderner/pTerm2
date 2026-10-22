@@ -166,6 +166,48 @@ public final class SSHSession: @unchecked Sendable {
         _ = pad_ssh_resize(handle, Int32(columns), Int32(rows))
     }
 
+    public func setReadTimeout(milliseconds: Int) {
+        guard let handle else {
+            return
+        }
+        pad_ssh_set_timeout(handle, milliseconds)
+    }
+
+    public enum SSHChunk {
+        case data(Data)
+        case timeout
+        case closed
+    }
+
+    public func readChunk(maxLength: Int = 4096) -> SSHChunk {
+        guard let handle else {
+            return .closed
+        }
+        var buffer = [UInt8](repeating: 0, count: maxLength)
+        let count = pad_ssh_read(handle, &buffer, buffer.count)
+        if count > 0 {
+            return .data(Data(buffer.prefix(Int(count))))
+        }
+        if count == -9 || count == -37 {
+            return .timeout
+        }
+        return .closed
+    }
+
+    public func remoteBanner() -> String {
+        guard let handle else {
+            return ""
+        }
+        return String(cString: pad_ssh_banner(handle))
+    }
+
+    public func authMethods() -> String {
+        guard let handle else {
+            return ""
+        }
+        return String(cString: pad_ssh_auth_methods(handle))
+    }
+
     public func disconnect() {
         if let handle {
             pad_ssh_disconnect(handle)

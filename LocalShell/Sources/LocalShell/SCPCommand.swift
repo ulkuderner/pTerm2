@@ -46,7 +46,7 @@ struct SCPCommand: ShellCommand {
         let remote = try parseRemote(remoteSpec, defaultPort: port)
         var host = remote.host
         host.port = port
-        let key = identityPath.flatMap { try? String(contentsOf: resolve($0, relativeTo: context), encoding: .utf8) }
+        let key = SSHIdentities.privateKey(path: identityPath, context: context)
         let localURL = resolve(localSpec, relativeTo: context)
         if sending {
             try SSHSession.scpSend(host: host,

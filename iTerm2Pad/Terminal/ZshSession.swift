@@ -46,6 +46,22 @@ final class ZshSession {
     private var spawnStatus: Int32 = -1
     var launchClaude = false
     private var claudeBusy = false
+    private enum InputMode {
+        case local
+        case password
+        case connecting
+        case remote
+    }
+    private var inputMode = InputMode.local
+    private var asking: SSHHost?
+    private var askingVerbose = 0
+    private var askingKey: String?
+    private var remote: SSHSession?
+    private var remoteQueue: [Data] = []
+    private let remoteLock = NSLock()
+    private var pumpStop = false
+    private var termColumns = 80
+    private var termRows = 24
 
     static var accountHome: String {
         if let users = try? FileManager.default.contentsOfDirectory(atPath: "/Users") {
@@ -64,10 +80,18 @@ final class ZshSession {
             return
         }
         started = true
+        termColumns = Int(columns)
+        termRows = Int(rows)
         startBundledZsh(columns: columns, rows: rows)
     }
 
     func send(_ data: Data) {
+        if inputMode == .connecting || inputMode == .remote {
+            remoteLock.lock()
+            remoteQueue.append(data)
+            remoteLock.unlock()
+            return
+        }
         if builtin != nil {
             acceptBuiltin(data)
             return
@@ -85,6 +109,10 @@ final class ZshSession {
     }
 
     func resize(columns: Int, rows: Int) {
+        termColumns = columns
+        termRows = rows
+        builtin?.promptColumns = columns
+        remote?.resize(columns: columns, rows: rows)
         guard master >= 0 else {
             return
         }
@@ -95,6 +123,10 @@ final class ZshSession {
 
     func stop() {
         onExit = nil
+        pumpStop = true
+        remote?.disconnect()
+        remote = nil
+        inputMode = .local
         builtin = nil
         launchSource?.cancel()
         launchSource = nil
@@ -371,7 +403,7 @@ final class ZshSession {
         try? fileManager.createDirectory(at: prefix.appendingPathComponent("Cellar"), withIntermediateDirectories: true)
         let zshrc = profile.appendingPathComponent(".zshrc")
         let stamp = profile.appendingPathComponent(".pterm2-zshrc")
-        if (try? String(contentsOf: stamp, encoding: .utf8)) != "42" {
+        if (try? String(contentsOf: stamp, encoding: .utf8)) != "43" {
             let bundledP10k = Bundle.main.bundleURL.appendingPathComponent("Shell/omz/p10k.zsh")
             let installedP10k = profile.appendingPathComponent(".p10k.zsh")
             if fileManager.fileExists(atPath: bundledP10k.path) {
@@ -477,6 +509,8 @@ final class ZshSession {
               unalias "$pterm_cmd" 2>/dev/null
               eval "$pterm_cmd() { pterm_arm $pterm_cmd \\"\\$@\\"; }"
             done
+            'ssh-keygen'() { pterm_arm ssh-keygen "$@"; }
+            'ssh-copy-id'() { pterm_arm ssh-copy-id "$@"; }
             unset pterm_cmd
             if [[ $PS1 == '%m%# ' ]]; then
               PS1=$'%F{green}%~%f %# '
@@ -492,7 +526,7 @@ final class ZshSession {
             """
             do {
                 try text.write(to: zshrc, atomically: false, encoding: .utf8)
-                try Data("42".utf8).write(to: stamp)
+                try Data("43".utf8).write(to: stamp)
             } catch {
                 startupFault = "pterm: shell startup \(zshrc.path) (\(error.localizedDescription))\r\n"
             }
@@ -605,6 +639,7 @@ final class ZshSession {
             self?.writeTerminal(text)
         }
         builtin = shell
+        shell.promptColumns = termColumns
         if let missingNotice {
             writeTerminal(missingNotice + "\r\n")
         } else {
@@ -641,10 +676,21 @@ final class ZshSession {
                 writeTerminal("claude> ")
             }
         }
+        if CommandLine.arguments.contains("-pterm-prompt-test") {
+            send(Data("ssh-keygen -t ed25519 -N \"\" -C pterm-test\r".utf8))
+            send(Data("ssh-keygen -l\r".utf8))
+            send(Data("brew search py\r".utf8))
+            send(Data("ssh -v -p 9 mobile@127.0.0.1\r".utf8))
+            send(Data("s3cret-not-shown\r".utf8))
+        }
     }
 
     private func acceptBuiltin(_ data: Data) {
         for byte in data {
+            if inputMode == .password {
+                acceptPassword(byte)
+                continue
+            }
             if !pendingEscape.isEmpty || byte == 0x1b {
                 pendingEscape.append(Character(UnicodeScalar(byte)))
                 if pendingEscape.count > 1, let last = pendingEscape.last, last.isLetter || last == "~" {
@@ -706,8 +752,21 @@ final class ZshSession {
                     return
                 }
                 _ = builtin?.run(command)
-                if SSHLaunchMailbox.pending != nil {
-                    NotificationCenter.default.post(name: .ptermSSHLaunch, object: nil)
+                if let pending = SSHLaunchMailbox.pending {
+                    SSHLaunchMailbox.pending = nil
+                    asking = pending.host
+                    askingVerbose = pending.verbose
+                    askingKey = pending.privateKeyPEM
+                    line = ""
+                    if let key = pending.privateKeyPEM, !key.isEmpty {
+                        if pending.verbose > 0 {
+                            writeTerminal("debug1: Offering public key.\r\n")
+                        }
+                        beginRemote(pending.host, password: "", pem: key, verbose: pending.verbose, fallbackToPassword: true)
+                        return
+                    }
+                    askForPassword(pending.host, verbose: pending.verbose)
+                    return
                 }
                 writeTerminal(builtin?.prompt() ?? "")
             case 0x09:
@@ -734,6 +793,153 @@ final class ZshSession {
                 writeTerminal(character)
             default:
                 break
+            }
+        }
+    }
+
+    private func acceptPassword(_ byte: UInt8) {
+        switch byte {
+        case 0x0d, 0x0a:
+            writeTerminal("\r\n")
+            let password = line
+            let host = asking
+            line = ""
+            asking = nil
+            inputMode = .local
+            guard let host else {
+                writeTerminal(builtin?.prompt() ?? "")
+                return
+            }
+            beginRemote(host, password: password, pem: askingKey, verbose: askingVerbose, fallbackToPassword: false)
+        case 0x03:
+            line = ""
+            asking = nil
+            inputMode = .local
+            writeTerminal("^C\r\n")
+            writeTerminal(builtin?.prompt() ?? "")
+        case 0x7f, 0x08:
+            if !line.isEmpty {
+                line.removeLast()
+            }
+        case 32...126:
+            line.append(Character(UnicodeScalar(byte)))
+        default:
+            break
+        }
+    }
+
+    private func askForPassword(_ host: SSHHost, verbose: Int) {
+        asking = host
+        askingVerbose = verbose
+        inputMode = .password
+        line = ""
+        if verbose > 0 {
+            writeTerminal("debug1: Connecting to \(host.hostname) port \(host.port).\r\n")
+        }
+        writeTerminal(String(localized: "Pad.SSH.PasswordPrompt",
+                             defaultValue: "\(host.username)@\(host.hostname)’s password: ",
+                             comment: "Hidden password prompt drawn in the terminal, in the style of OpenSSH."))
+    }
+
+    private func beginRemote(_ host: SSHHost, password: String, pem: String?, verbose: Int, fallbackToPassword: Bool) {
+        inputMode = .connecting
+        pumpStop = false
+        let columns = termColumns
+        let rows = termRows
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let session = SSHSession()
+            do {
+                try session.connect(host: host, privateKeyPEM: pem, password: password.isEmpty ? nil : password)
+                if verbose > 0 {
+                    let banner = session.remoteBanner()
+                    let methods = session.authMethods()
+                    DispatchQueue.main.async {
+                        if !banner.isEmpty {
+                            self?.writeTerminal("debug1: Remote protocol version \(banner).\r\n")
+                        }
+                        if !methods.isEmpty {
+                            self?.writeTerminal("debug1: Authentications that can continue: \(methods).\r\n")
+                        }
+                        self?.writeTerminal("debug1: Authentication succeeded (\(host.username)).\r\n")
+                    }
+                }
+                if host.remoteCommand.isEmpty {
+                    try session.startShell(columns: columns, rows: rows)
+                } else {
+                    try session.exec(host.remoteCommand, columns: columns, rows: rows)
+                }
+                session.setReadTimeout(milliseconds: 50)
+            } catch {
+                session.disconnect()
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    if fallbackToPassword && error.localizedDescription.contains("authentication failed") {
+                        self.inputMode = .local
+                        self.askForPassword(host, verbose: verbose)
+                        return
+                    }
+                    self.inputMode = .local
+                    self.builtin?.lastStatus = 1
+                    self.remoteLock.lock()
+                    self.remoteQueue.removeAll()
+                    self.remoteLock.unlock()
+                    if verbose > 0 {
+                        self.writeTerminal("debug1: \(error.localizedDescription)\r\n")
+                    } else {
+                        self.writeTerminal(error.localizedDescription + "\r\n")
+                    }
+                    self.builtin?.promptColumns = self.termColumns
+                    self.writeTerminal(self.builtin?.prompt() ?? "")
+                }
+                return
+            }
+            DispatchQueue.main.async {
+                self?.remote = session
+                self?.inputMode = .remote
+            }
+            self?.pump(session)
+        }
+    }
+
+    private func pump(_ session: SSHSession) {
+        while !pumpStop {
+            var outgoing: [Data] = []
+            remoteLock.lock()
+            outgoing = remoteQueue
+            remoteQueue.removeAll()
+            remoteLock.unlock()
+            for data in outgoing where !data.isEmpty {
+                session.write(data)
+            }
+            switch session.readChunk() {
+            case .data(let data):
+                writeRaw(data)
+            case .timeout:
+                continue
+            case .closed:
+                pumpStop = true
+            }
+        }
+        session.disconnect()
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.remote = nil
+            self.inputMode = .local
+            self.remoteLock.lock()
+            self.remoteQueue.removeAll()
+            self.remoteLock.unlock()
+            self.writeTerminal("\r\n")
+            self.writeTerminal(self.builtin?.prompt() ?? "")
+        }
+    }
+
+    private func writeRaw(_ data: Data) {
+        guard !data.isEmpty else { return }
+        if Thread.isMainThread {
+            onOutput?(data)
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                self?.onOutput?(data)
             }
         }
     }

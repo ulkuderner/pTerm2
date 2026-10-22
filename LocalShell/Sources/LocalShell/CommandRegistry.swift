@@ -120,7 +120,7 @@ public final class CommandRegistry: @unchecked Sendable {
     }
 
     private func listCommands(context: CommandContext) {
-        let extras = ["git", "scp", "ssh", "sshfs", "umount", "python3", "pip3", "mosh", "brew", "claude"]
+        let extras = ["git", "scp", "ssh", "ssh-keygen", "ssh-copy-id", "sshfs", "umount", "python3", "pip3", "mosh", "brew", "claude"]
         let names = (Self.blinkCommands + extras + ["help"]).sorted()
         context.stdout(names.joined(separator: "  ") + "\n")
     }
@@ -145,6 +145,8 @@ public final class CommandRegistry: @unchecked Sendable {
         register(WCCommand())
         register(SetenvCommand())
         register(SSHCommand())
+        register(SSHKeygenCommand())
+        register(SSHCopyIDCommand())
         register(SCPCommand())
         register(GitCommand())
         register(SSHFSCommand())
@@ -159,10 +161,12 @@ public final class CommandRegistry: @unchecked Sendable {
         var tokens: [String] = []
         var current = ""
         var quote: Character?
+        var quoted = false
         for ch in line {
             if let q = quote {
                 if ch == q {
                     quote = nil
+                    quoted = true
                 } else {
                     current.append(ch)
                 }
@@ -173,15 +177,16 @@ public final class CommandRegistry: @unchecked Sendable {
                 continue
             }
             if ch.isWhitespace {
-                if !current.isEmpty {
+                if quoted || !current.isEmpty {
                     tokens.append(current)
                     current = ""
+                    quoted = false
                 }
                 continue
             }
             current.append(ch)
         }
-        if !current.isEmpty {
+        if quoted || !current.isEmpty {
             tokens.append(current)
         }
         return tokens

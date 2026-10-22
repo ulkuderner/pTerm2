@@ -6,6 +6,19 @@ import SSHClient
 public struct SSHLaunchRequest: Equatable, Sendable {
     public var host: SSHHost
     public var password: String?
+    public var verbose: Int
+    public var privateKeyPEM: String?
+
+    public init(host: SSHHost, password: String? = nil, verbose: Int = 0, privateKeyPEM: String? = nil) {
+        self.host = host
+        self.password = password
+        self.verbose = verbose
+        self.privateKeyPEM = privateKeyPEM
+    }
+}
+
+public extension Notification.Name {
+    static let ptermSSHKeysChanged = Notification.Name("ptermSSHKeysChanged")
 }
 
 public enum SSHLaunchMailbox {
@@ -26,6 +39,7 @@ struct SSHCommand: ShellCommand {
         var userHost: String?
         var i = 0
         var remoteCommand = ""
+        var verbose = 0
         while i < arguments.count {
             let arg = arguments[i]
             if arg == "-p", i + 1 < arguments.count {
@@ -36,6 +50,11 @@ struct SSHCommand: ShellCommand {
             if arg == "-i", i + 1 < arguments.count {
                 identity = arguments[i + 1]
                 i += 2
+                continue
+            }
+            if arg.hasPrefix("-") && arg.dropFirst().allSatisfy({ $0 == "v" }) && arg.count > 1 {
+                verbose = max(verbose, arg.count - 1)
+                i += 1
                 continue
             }
             if arg == "--" {
@@ -52,7 +71,7 @@ struct SSHCommand: ShellCommand {
             i += 1
         }
         guard let userHost else {
-            throw ShellError.usage("ssh [-p port] [-i identity] user@host [command]")
+            throw ShellError.usage("ssh [-v] [-p port] [-i identity] user@host [command]")
         }
         let parts = userHost.split(separator: "@", maxSplits: 1)
         let user: String
@@ -65,9 +84,7 @@ struct SSHCommand: ShellCommand {
             hostName = userHost
         }
         var host = SSHHost(name: hostName, hostname: hostName, port: port, username: user)
-        if !remoteCommand.isEmpty {
-            host.remoteCommand = remoteCommand
-        }
+        host.remoteCommand = remoteCommand
         if name == "mosh" {
             host.useMosh = true
             if host.wantsTmuxControl {
@@ -77,17 +94,14 @@ struct SSHCommand: ShellCommand {
                 host.useMosh = false
             }
         }
-        _ = identity
+        let pem = SSHIdentities.privateKey(path: identity, context: context)
         guard SSHSession.backendReady else {
             context.stderr(String(localized: "Shell.SSHLibraryMissing",
                                   defaultValue: "ssh cannot connect: libssh2 is not linked into this build.\n",
                                   comment: "Shown when ssh is typed and the SSH library was not compiled in."))
             return 1
         }
-        SSHLaunchMailbox.pending = SSHLaunchRequest(host: host, password: nil)
-        context.stdout(String(localized: "Shell.SSHOpening",
-                              defaultValue: "Opening SSH session to \(user)@\(hostName)…\n",
-                              comment: "Local-shell confirmation that an ssh command is handing off to the terminal. %1$@ is the user, %2$@ is the host."))
+        SSHLaunchMailbox.pending = SSHLaunchRequest(host: host, verbose: verbose, privateKeyPEM: pem)
         return 0
     }
 }

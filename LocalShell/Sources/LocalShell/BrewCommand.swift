@@ -20,6 +20,18 @@ struct BrewCommand: ShellCommand {
         case "--prefix":
             context.stdout(prefix.path + "\n")
             return 0
+        case "search":
+            let query = arguments.dropFirst()
+                .filter { !$0.hasPrefix("-") }
+                .joined(separator: " ")
+                .lowercased()
+            let names = Self.builtIn.filter { query.isEmpty || $0.contains(query) }
+            if names.isEmpty {
+                context.stdout("No command matches \(query).\n")
+            } else {
+                context.stdout(names.joined(separator: "\n") + "\n")
+            }
+            return 0
         case "list", "help", "--help":
             context.stdout("ARM64 commands built into pTerm2:\n")
             context.stdout(Self.builtIn.joined(separator: "  ") + "\n")
@@ -53,7 +65,7 @@ struct BrewCommand: ShellCommand {
             }
             return status
         default:
-            throw ShellError.usage("brew [--prefix|list|install PACKAGE]")
+            throw ShellError.usage("brew [--prefix|list|search|install PACKAGE]")
         }
     }
 }

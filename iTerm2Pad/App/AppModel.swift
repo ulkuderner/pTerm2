@@ -48,6 +48,7 @@ final class AppModel {
     let hostStore = HostStore()
     let keychain = KeychainStore()
     let documents: URL
+    private var keyObserver: NSObjectProtocol?
 
     init(documents: URL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]) {
         self.documents = documents
@@ -58,6 +59,13 @@ final class AppModel {
             tab = .settings
         }
         reload()
+        keyObserver = NotificationCenter.default.addObserver(
+            forName: .ptermSSHKeysChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.reload()
+        }
     }
 
     func reload() {
