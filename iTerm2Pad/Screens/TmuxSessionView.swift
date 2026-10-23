@@ -6,6 +6,7 @@ struct TmuxSessionView: View {
     var session: LiveSession
     @State private var selectedWindow: Int?
     @State private var selectedPane: Int?
+    @State private var seenPanes: Set<Int> = []
     @State private var feeds: [Int: Data] = [:]
     @State private var windowsTick = 0
 
@@ -82,13 +83,20 @@ struct TmuxSessionView: View {
         .onAppear {
             session.tmux.onWindowsChanged = {
                 windowsTick += 1
+                let panes = Set(session.tmux.windows.flatMap { $0.layout?.windowPanes() ?? [] })
+                let added = panes.subtracting(seenPanes)
+                seenPanes = panes
                 if selectedWindow == nil {
                     selectedWindow = session.tmux.windows.first?.id
-                    selectedPane = session.tmux.windows.first?.layout?.windowPanes().first
+                }
+                if selectedPane == nil || (selectedPane.map { !panes.contains($0) } ?? true) {
+                    selectedPane = panes.max()
+                } else if let newest = added.max() {
+                    selectedPane = newest
                 }
             }
             session.tmux.onPaneOutput = { pane, data in
-                feeds[pane] = data
+                feeds[pane, default: Data()].append(data)
             }
             for window in session.tmux.windows {
                 for pane in window.layout?.windowPanes() ?? [] {
@@ -98,7 +106,7 @@ struct TmuxSessionView: View {
                 }
             }
         }
-        .id(windowsTick)
+        .background(Color.clear.opacity(windowsTick < 0 ? 1 : 0))
     }
 
     private func movePane(_ command: String) {
@@ -146,19 +154,27 @@ struct TmuxSplitView: View {
         case .leaf:
             paneView(node)
         case .hSplit:
-            VStack(spacing: 3) {
-                ForEach(Array(node.children.enumerated()), id: \.offset) { _, child in
-                    splitChild(child)
+            GeometryReader { geo in
+                let total = max(node.children.map { $0.height ?? 1 }.reduce(0, +), 1)
+                VStack(spacing: 3) {
+                    ForEach(Array(node.children.enumerated()), id: \.offset) { _, child in
+                        splitChild(child)
+                            .frame(height: geo.size.height * CGFloat(child.height ?? 1) / CGFloat(total))
+                    }
                 }
+                .background(Color(uiColor: .opaqueSeparator))
             }
-            .background(Color(uiColor: .opaqueSeparator))
         case .vSplit:
-            HStack(spacing: 3) {
-                ForEach(Array(node.children.enumerated()), id: \.offset) { _, child in
-                    splitChild(child)
+            GeometryReader { geo in
+                let total = max(node.children.map { $0.width ?? 1 }.reduce(0, +), 1)
+                HStack(spacing: 3) {
+                    ForEach(Array(node.children.enumerated()), id: \.offset) { _, child in
+                        splitChild(child)
+                            .frame(width: geo.size.width * CGFloat(child.width ?? 1) / CGFloat(total))
+                    }
                 }
+                .background(Color(uiColor: .opaqueSeparator))
             }
-            .background(Color(uiColor: .opaqueSeparator))
         }
     }
 

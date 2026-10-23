@@ -151,7 +151,7 @@ final class AppModel {
 @Observable
 final class LiveSession {
     let host: SSHHost
-    let ssh = SSHSession()
+    let ssh: SSHSession
     let tmux = TmuxSession()
     private let privateKeyPEM: String?
     private let password: String?
@@ -161,14 +161,32 @@ final class LiveSession {
 
     init(host: SSHHost, privateKeyPEM: String?, password: String?) {
         self.host = host
+        self.ssh = SSHSession()
         self.privateKeyPEM = privateKeyPEM
         self.password = password
+    }
+
+    /// The shell already authenticated. This session only speaks tmux control mode.
+    init(host: SSHHost, connected session: SSHSession) {
+        self.host = host
+        self.ssh = session
+        self.privateKeyPEM = nil
+        self.password = nil
+    }
+
+    func startControl(columns: Int, rows: Int) {
+        tmux.attach { [weak self] command in
+            self?.ssh.write(Data(command.utf8))
+        }
+        connected = true
+        startReading()
+        resize(columns: columns, rows: rows)
     }
 
     func start() throws {
         try ssh.connect(host: host, privateKeyPEM: privateKeyPEM, password: password)
         if host.wantsTmuxControl && !host.remoteCommand.isEmpty {
-            try ssh.exec(TmuxStandard.launchCommand(remoteCommand: host.remoteCommand), columns: 80, rows: 24)
+            try ssh.execControl(TmuxStandard.launchCommand(remoteCommand: host.remoteCommand))
             tmux.attach { [weak self] command in
                 self?.ssh.write(Data(command.utf8))
             }

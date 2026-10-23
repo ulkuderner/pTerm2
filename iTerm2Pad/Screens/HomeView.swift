@@ -38,6 +38,11 @@ struct HomeView: View {
         .onReceive(NotificationCenter.default.publisher(for: .ptermSSHLaunch)) { _ in
             model.consumePendingSSHLaunch()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .ptermOpenLiveSession)) { note in
+            if let session = note.object as? LiveSession {
+                model.activeSession = session
+            }
+        }
         .sheet(isPresented: Binding(
             get: { model.sshPasswordPrompt != nil },
             set: { if !$0 { model.cancelSSHPassword() } }

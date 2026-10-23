@@ -5,6 +5,7 @@ import SSHClient
 
 extension Notification.Name {
     static let ptermSSHLaunch = Notification.Name("ptermSSHLaunch")
+    static let ptermOpenLiveSession = Notification.Name("ptermOpenLiveSession")
 }
 
 @_silgen_name("pterm_start_zsh")
@@ -683,6 +684,94 @@ final class ZshSession {
             send(Data("ssh -v -p 9 mobile@127.0.0.1\r".utf8))
             send(Data("s3cret-not-shown\r".utf8))
         }
+        if CommandLine.arguments.contains("-pterm-ssh-live") {
+            probeLiveSSH()
+        }
+    }
+
+    /// Talks to a real sshd named in ssh-live.txt. Used to prove login, a remote
+    /// command, and tmux control mode before a TestFlight upload.
+    private func probeLiveSSH() {
+        let specURL = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("ssh-live.txt")
+        let keyURL = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".ssh/id_ed25519")
+        guard let spec = try? String(contentsOf: specURL, encoding: .utf8),
+              let line = spec.split(separator: "\n").first else {
+            writeTerminal("LIVE missing ssh-live.txt\r\n")
+            return
+        }
+        let parts = line.split(separator: " ")
+        guard parts.count >= 2 else {
+            writeTerminal("LIVE missing target\r\n")
+            return
+        }
+        let user = String(parts[0])
+        let hostName = String(parts[1])
+        let port = parts.count >= 3 ? Int(parts[2]) ?? 22 : 22
+        let secret = parts.count >= 4 ? String(parts[3]) : nil
+        let pem = secret == nil ? (try? String(contentsOf: keyURL, encoding: .utf8)) : nil
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            func report(_ text: String) {
+                self?.writeTerminal(text.hasSuffix("\n") ? text : text + "\r\n")
+            }
+            func readSome(_ session: SSHSession, seconds: TimeInterval, enough: Int) -> Data {
+                session.setReadTimeout(milliseconds: 400)
+                var output = Data()
+                let deadline = Date().addingTimeInterval(seconds)
+                while Date() < deadline && output.count < enough {
+                    switch session.readChunk() {
+                    case .data(let chunk):
+                        output.append(chunk)
+                    case .closed:
+                        return output
+                    case .timeout:
+                        if output.count >= enough {
+                            return output
+                        }
+                    }
+                }
+                return output
+            }
+            var denied = SSHHost(name: hostName, hostname: hostName, port: port, username: "nobody")
+            denied.remoteCommand = "echo no"
+            let reject = SSHSession()
+            do {
+                try reject.connect(host: denied, privateKeyPEM: pem, password: secret == nil ? nil : "wrong-password")
+                report("LIVE reject-unexpected-success")
+                reject.disconnect()
+            } catch {
+                report("LIVE reject \(error.localizedDescription)")
+                reject.disconnect()
+            }
+            var echoHost = SSHHost(name: hostName, hostname: hostName, port: port, username: user)
+            echoHost.remoteCommand = "echo pterm-ssh-ok"
+            let echo = SSHSession()
+            do {
+                try echo.connect(host: echoHost, privateKeyPEM: pem, password: secret)
+                try echo.exec("echo pterm-ssh-ok", columns: 80, rows: 24)
+                let output = readSome(echo, seconds: 4, enough: 80)
+                let text = String(data: output, encoding: .utf8) ?? ""
+                report(text.contains("pterm-ssh-ok") ? "LIVE echo ok" : "LIVE echo missing \(text.prefix(120))")
+            } catch {
+                report("LIVE echo \(error.localizedDescription)")
+            }
+            echo.disconnect()
+            var tmuxHost = SSHHost(name: hostName, hostname: hostName, port: port, username: user)
+            tmuxHost.remoteCommand = "/opt/homebrew/bin/tmux -CC new -A -s pterm-live-test"
+            let tmux = SSHSession()
+            do {
+                try tmux.connect(host: tmuxHost, privateKeyPEM: pem, password: secret)
+                try tmux.execControl(tmuxHost.remoteCommand)
+                _ = tmux.write(Data("split-window -h\n".utf8))
+                let output = readSome(tmux, seconds: 5, enough: 500)
+                let text = String(data: output, encoding: .utf8) ?? ""
+                let ok = text.contains("%begin") || text.contains("layout-change") || text.contains("%end") || text.contains("\u{1b}P1000p")
+                report(ok ? "LIVE tmux ok" : "LIVE tmux missing \(text.prefix(160))")
+                report(text.contains("layout-change") ? "LIVE layout yes" : "LIVE layout no")
+            } catch {
+                report("LIVE tmux \(error.localizedDescription)")
+            }
+            tmux.disconnect()
+        }
     }
 
     private func acceptBuiltin(_ data: Data) {
@@ -862,6 +951,23 @@ final class ZshSession {
                         }
                         self?.writeTerminal("debug1: Authentication succeeded (\(host.username)).\r\n")
                     }
+                }
+                if host.wantsTmuxControl {
+                    let command = TmuxStandard.launchCommand(remoteCommand: host.remoteCommand)
+                    try session.execControl(command)
+                    let live = LiveSession(host: host, connected: session)
+                    live.startControl(columns: columns, rows: rows)
+                    DispatchQueue.main.async {
+                        guard let self else { return }
+                        self.inputMode = .local
+                        self.writeTerminal(String(localized: "Pad.SSH.TmuxOpen",
+                                                  defaultValue: "Opened tmux. Command-D puts a pane beside this one. Command-Shift-D stacks one below.\r\n",
+                                                  comment: "Shown in the local shell when ssh hands the connection to native tmux panes"))
+                        self.builtin?.promptColumns = self.termColumns
+                        self.writeTerminal(self.builtin?.prompt() ?? "")
+                        NotificationCenter.default.post(name: .ptermOpenLiveSession, object: live)
+                    }
+                    return
                 }
                 if host.remoteCommand.isEmpty {
                     try session.startShell(columns: columns, rows: rows)

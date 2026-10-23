@@ -8,7 +8,10 @@
 #include <libssh2.h>
 #include <libssh2_sftp.h>
 #include <arpa/inet.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <netdb.h>
+#include <poll.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -39,12 +42,31 @@ static int tcp_connect(const char *host, int port, char *errbuf, size_t errlen) 
         freeaddrinfo(res);
         return -1;
     }
-    if (connect(sock, res->ai_addr, res->ai_addrlen) != 0) {
+    int flags = fcntl(sock, F_GETFL, 0);
+    fcntl(sock, F_SETFL, flags | O_NONBLOCK);
+    int connected = connect(sock, res->ai_addr, res->ai_addrlen);
+    if (connected != 0 && errno != EINPROGRESS) {
         snprintf(errbuf, errlen, "connect failed");
         close(sock);
         freeaddrinfo(res);
         return -1;
     }
+    if (connected != 0) {
+        struct pollfd pfd;
+        pfd.fd = sock;
+        pfd.events = POLLOUT;
+        pfd.revents = 0;
+        int waited = poll(&pfd, 1, 8000);
+        int soerr = 0;
+        socklen_t slen = sizeof(soerr);
+        if (waited <= 0 || getsockopt(sock, SOL_SOCKET, SO_ERROR, &soerr, &slen) != 0 || soerr != 0) {
+            snprintf(errbuf, errlen, waited == 0 ? "connect timed out" : "connect failed");
+            close(sock);
+            freeaddrinfo(res);
+            return -1;
+        }
+    }
+    fcntl(sock, F_SETFL, flags);
     freeaddrinfo(res);
     return sock;
 }
@@ -88,10 +110,13 @@ static void keyboard_callback(const char *name, int name_len,
     }
 }
 
-static void auth_fail(LIBSSH2_SESSION *session, const char *methods, char *errbuf, size_t errlen) {
+static void auth_fail(LIBSSH2_SESSION *session, const char *methods, int failure, char *errbuf, size_t errlen) {
     char *message = NULL;
     int length = 0;
     int code = libssh2_session_last_error(session, &message, &length, 0);
+    if (code == 0) {
+        code = failure;
+    }
     if (methods && methods[0]) {
         snprintf(errbuf, errlen, "authentication failed (%d). server allows: %s", code, methods);
     } else if (message && message[0]) {
@@ -130,6 +155,8 @@ static int authenticate(LIBSSH2_SESSION *session,
     int known = methods[0] != '\0';
     strncpy(g_auth_methods, methods, sizeof(g_auth_methods) - 1);
     g_auth_methods[sizeof(g_auth_methods) - 1] = '\0';
+    int failure = 0;
+    const char *passphrase = password ? password : "";
     if (private_key_pem && private_key_pem[0] && (!known || offers(methods, "publickey"))) {
         int rc = libssh2_userauth_publickey_frommemory(session,
                                                        user,
@@ -138,10 +165,11 @@ static int authenticate(LIBSSH2_SESSION *session,
                                                        0,
                                                        private_key_pem,
                                                        strlen(private_key_pem),
-                                                       password);
+                                                       passphrase);
         if (rc == 0) {
             return 0;
         }
+        failure = rc;
     }
     if (password) {
         *libssh2_session_abstract(session) = (void *)password;
@@ -150,15 +178,20 @@ static int authenticate(LIBSSH2_SESSION *session,
             if (rc == 0) {
                 return 0;
             }
+            failure = rc;
         }
         if (!known || offers(methods, "password")) {
             int rc = libssh2_userauth_password(session, user, password);
             if (rc == 0) {
                 return 0;
             }
+            failure = rc;
         }
     }
-    auth_fail(session, methods, errbuf, errlen);
+    if (failure == 0) {
+        failure = libssh2_session_last_errno(session);
+    }
+    auth_fail(session, methods, failure, errbuf, errlen);
     return -1;
 }
 
@@ -237,6 +270,17 @@ int pad_ssh_exec(PadSSHSession *session, const char *command, int columns, int r
     }
     libssh2_channel_request_pty(session->channel, "xterm-256color");
     libssh2_channel_request_pty_size(session->channel, columns, rows);
+    return libssh2_channel_exec(session->channel, command);
+}
+
+int pad_ssh_exec_control(PadSSHSession *session, const char *command) {
+    if (!session) {
+        return -1;
+    }
+    session->channel = libssh2_channel_open_session(session->session);
+    if (!session->channel) {
+        return -1;
+    }
     return libssh2_channel_exec(session->channel, command);
 }
 
@@ -472,6 +516,11 @@ int pad_ssh_open_shell(PadSSHSession *session, int columns, int rows) {
 
 int pad_ssh_exec(PadSSHSession *session, const char *command, int columns, int rows) {
     (void)session; (void)command; (void)columns; (void)rows;
+    return -1;
+}
+
+int pad_ssh_exec_control(PadSSHSession *session, const char *command) {
+    (void)session; (void)command;
     return -1;
 }
 

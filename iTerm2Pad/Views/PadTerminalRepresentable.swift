@@ -31,7 +31,7 @@ struct PadTerminalRepresentable: UIViewRepresentable {
         uiView.onSplitVertical = onSplitVertical
         uiView.onSplitHorizontal = onSplitHorizontal
         if let feed, !feed.isEmpty {
-            uiView.terminal.feed(byteArray: ArraySlice(feed))
+            context.coordinator.feedNew(feed, into: uiView.terminal)
         }
     }
 
@@ -39,6 +39,17 @@ struct PadTerminalRepresentable: UIViewRepresentable {
         var onSend: (Data) -> Void
         var onSize: (Int, Int) -> Void
         weak var terminal: TerminalView?
+        var fedCount = 0
+
+        func feedNew(_ data: Data, into terminal: TerminalView) {
+            if data.count < fedCount {
+                fedCount = 0
+            }
+            guard data.count > fedCount else { return }
+            let delta = data.subdata(in: fedCount..<data.count)
+            fedCount = data.count
+            terminal.feed(byteArray: ArraySlice(delta))
+        }
         private var themeObserver: NSObjectProtocol?
 
         init(onSend: @escaping (Data) -> Void, onSize: @escaping (Int, Int) -> Void) {

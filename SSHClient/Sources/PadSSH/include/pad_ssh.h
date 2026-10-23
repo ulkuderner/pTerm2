@@ -21,6 +21,7 @@ PadSSHSession *pad_ssh_connect(const char *host,
 
 int pad_ssh_open_shell(PadSSHSession *session, int columns, int rows);
 int pad_ssh_exec(PadSSHSession *session, const char *command, int columns, int rows);
+int pad_ssh_exec_control(PadSSHSession *session, const char *command);
 int pad_ssh_read(PadSSHSession *session, void *buffer, size_t length);
 int pad_ssh_write(PadSSHSession *session, const void *buffer, size_t length);
 int pad_ssh_resize(PadSSHSession *session, int columns, int rows);

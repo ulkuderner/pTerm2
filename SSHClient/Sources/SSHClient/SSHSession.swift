@@ -135,6 +135,17 @@ public final class SSHSession: @unchecked Sendable {
         }
     }
 
+    /// tmux -CC must not have a pty. A pty turns the control stream into a cooked terminal.
+    public func execControl(_ command: String) throws {
+        guard let handle else {
+            throw SSHClientError.notConnected
+        }
+        let rc = command.withCString { pad_ssh_exec_control(handle, $0) }
+        if rc != 0 {
+            throw SSHClientError.channelFailed
+        }
+    }
+
     public func read(maxLength: Int = 4096) -> Data {
         guard let handle else {
             return Data()

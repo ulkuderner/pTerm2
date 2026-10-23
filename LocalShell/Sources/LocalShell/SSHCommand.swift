@@ -84,7 +84,11 @@ struct SSHCommand: ShellCommand {
             hostName = userHost
         }
         var host = SSHHost(name: hostName, hostname: hostName, port: port, username: user)
-        host.remoteCommand = remoteCommand
+        if remoteCommand.isEmpty && name == "ssh" {
+            host.remoteCommand = "tmux -CC new -A -s main"
+        } else {
+            host.remoteCommand = remoteCommand
+        }
         if name == "mosh" {
             host.useMosh = true
             if host.wantsTmuxControl {
